@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; background: #f5f6f8; margin: 0; }
+main { max-width: 420px; margin: 60px auto; background: white; padding: 24px; border-radius: 8px; }
+label { display: block; margin-bottom: 14px; }
+input { display: block; width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+button { padding: 10px 16px; cursor: pointer; }
+.flash { background: #fff4d6; padding: 8px; border-radius: 4px; }

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Order - ClearSettle{% endblock %}
+{% block content %}
+<h1>Order details</h1>
+<p><strong>Buyer:</strong> {{ order.buyer_name }} ({{ order.buyer_email }})</p>
+<p><strong>Item:</strong> {{ order.description }}</p>
+<p><strong>Amount:</strong> {{ order.amount_cents | money }} {{ order.currency }}</p>
+<p><strong>Status:</strong> {{ order.status }}</p>
+<p><strong>PayPal order:</strong> {{ order.paypal_order_id or "Not paid yet" }}</p>
+<p><strong>Created:</strong> {{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</p>
+<p><a href="{{ url_for('orders.index') }}">Back to orders</a></p>
+{% endblock %}

@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Merchant dashboard</h1>
 <p>Logged in as <strong>{{ merchant.email }}</strong></p>
-<p>Orders will appear here soon.</p>
+<p><a href="{{ url_for('orders.index') }}">View orders</a> | <a href="{{ url_for('orders.new') }}">+ New order</a></p>
 <form method="post" action="{{ url_for('auth.logout') }}">
   <button type="submit">Log out</button>
 </form>

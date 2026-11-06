@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Buyer Consent - ClearSettle{% endblock %}
+
+{% block content %}
+
+<h1>Review the policy explanation</h1>
+
+<p>Hello {{ order.buyer_name }},</p>
+
+<p>
+    A merchant has asked you to review the following
+    ClearSettle policy explanation.
+</p>
+
+<h2>Order information</h2>
+
+<p><strong>Item:</strong> {{ order.description }}</p>
+
+<p>
+    <strong>Amount:</strong>
+    {{ order.amount_cents | money }} {{ order.currency }}
+</p>
+
+<h2>Buyer Protection explanation</h2>
+
+<p>{{ policy.text_en }}</p>
+
+<p>
+    <strong>Jurisdiction:</strong>
+    {{ policy.jurisdiction }}
+</p>
+
+<p>
+    <strong>Source:</strong>
+    <a href="{{ policy.source_url }}"
+       target="_blank"
+       rel="noopener noreferrer">
+        Official PayPal Buyer Protection page
+    </a>
+</p>
+
+<p>
+    By selecting Accept, you acknowledge that you reviewed
+    this ClearSettle explanation. This is not acceptance of
+    PayPal's legal terms and does not guarantee PayPal protection.
+</p>
+
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <button type="submit" name="decision" value="accepted">
+        Accept explanation
+    </button>
+
+    <button type="submit" name="decision" value="declined">
+        Decline
+    </button>
+</form>
+
+{% endblock %}

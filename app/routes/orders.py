@@ -1,9 +1,36 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+import secrets
+import hmac
+
+from flask import (
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session,
+    abort,
+)
+
 from app.services import order_service
+from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
 from app.utils.money import dollars_to_cents
 
+
 orders_bp = Blueprint("orders", __name__)
+
+
+def get_buyer_protection_policy():
+    policies = get_verified_policies()
+
+    return next(
+        (
+            policy for policy in policies
+            if policy.get("id") == "buyer_protection"
+        ),
+        None,
+    )
 
 
 @orders_bp.route("/orders")
@@ -21,6 +48,7 @@ def new():
         buyer_email = request.form.get("buyer_email", "").strip()
         description = request.form.get("description", "").strip()
         amount_cents = dollars_to_cents(request.form.get("amount", ""))
+
         if not buyer_name or len(buyer_name) > 100:
             flash("Enter the buyer's name (up to 100 characters).")
         elif "@" not in buyer_email:
@@ -31,17 +59,191 @@ def new():
             flash("Enter an amount from 0.01 to 10000.00 with at most 2 decimals.")
         else:
             order_id = order_service.create_order(
-                session["merchant_id"], buyer_name, buyer_email, description, amount_cents
+                session["merchant_id"],
+                buyer_name,
+                buyer_email,
+                description,
+                amount_cents,
             )
             flash("Order created.")
-            return redirect(url_for("orders.detail", order_id=str(order_id)))
+            return redirect(
+                url_for("orders.detail", order_id=str(order_id))
+            )
+
     return render_template("order_new.html")
 
 
 @orders_bp.route("/orders/<order_id>")
 @login_required
 def detail(order_id):
-    order = order_service.get_order(session["merchant_id"], order_id)
+    order = order_service.get_order(
+        session["merchant_id"],
+        order_id,
+    )
+
     if order is None:
         abort(404)
-    return render_template("order_detail.html", order=order)
+
+    csrf_token = session.setdefault(
+        "csrf_token",
+        secrets.token_urlsafe(32),
+    )
+
+    policy = get_buyer_protection_policy()
+
+    # Show the newly generated buyer link only once.
+    buyer_consent_link = session.pop("buyer_consent_link", None)
+
+    return render_template(
+        "order_detail.html",
+        order=order,
+        policy=policy,
+        csrf_token=csrf_token,
+        buyer_consent_link=buyer_consent_link,
+    )
+
+
+@orders_bp.route(
+    "/orders/<order_id>/merchant-consent",
+    methods=["POST"],
+)
+@login_required
+def merchant_consent(order_id):
+    submitted_token = request.form.get("csrf_token", "")
+    stored_token = session.get("csrf_token", "")
+
+    if (
+        not submitted_token
+        or not stored_token
+        or not hmac.compare_digest(submitted_token, stored_token)
+    ):
+        abort(400)
+
+    if get_buyer_protection_policy() is None:
+        flash("The verified Buyer Protection policy is unavailable.")
+        return redirect(
+            url_for("orders.detail", order_id=order_id)
+        )
+
+    decision = request.form.get("decision", "")
+
+    result = order_service.record_merchant_consent(
+        session["merchant_id"],
+        order_id,
+        decision,
+    )
+
+    if result is None:
+        flash(
+            "Decision not recorded. Check the order or whether "
+            "a decision was already submitted."
+        )
+
+    elif decision == "accepted":
+        session["buyer_consent_link"] = url_for(
+            "orders.buyer_consent",
+            token=result,
+            _external=True,
+        )
+        flash("Merchant consent recorded. Share the buyer link below.")
+
+    else:
+        flash("Merchant declined the explanation. No buyer link was created.")
+
+    return redirect(
+        url_for("orders.detail", order_id=order_id)
+    )
+
+
+@orders_bp.route(
+    "/buyer-consent/<token>",
+    methods=["GET", "POST"],
+)
+def buyer_consent(token):
+    order = order_service.get_order_by_buyer_token(token)
+
+    if order is None:
+        return render_template(
+            "buyer_consent_unavailable.html"
+        ), 404
+
+    policy = get_buyer_protection_policy()
+
+    if policy is None:
+        return render_template(
+            "buyer_consent_unavailable.html"
+        ), 503
+
+    csrf_token = session.setdefault(
+        "csrf_token",
+        secrets.token_urlsafe(32),
+    )
+
+    if request.method == "POST":
+        submitted_token = request.form.get("csrf_token", "")
+        stored_token = session.get("csrf_token", "")
+
+        if (
+            not submitted_token
+            or not stored_token
+            or not hmac.compare_digest(submitted_token, stored_token)
+        ):
+            abort(400)
+
+        decision = request.form.get("decision", "")
+
+        success = order_service.record_buyer_consent(
+            token,
+            decision,
+        )
+
+        if not success:
+            return render_template(
+                "buyer_consent_unavailable.html"
+            ), 409
+
+        return render_template(
+            "buyer_consent_result.html",
+            decision=decision,
+        )
+
+    return render_template(
+        "buyer_consent.html",
+        order=order,
+        policy=policy,
+        csrf_token=csrf_token,
+    )
+
+
+@orders_bp.route(
+    "/orders/<order_id>/new-buyer-link",
+    methods=["POST"],
+)
+@login_required
+def new_buyer_link(order_id):
+    submitted_token = request.form.get("csrf_token", "")
+    stored_token = session.get("csrf_token", "")
+
+    if (
+        not submitted_token
+        or not stored_token
+        or not hmac.compare_digest(submitted_token, stored_token)
+    ):
+        abort(400)
+
+    token = order_service.regenerate_buyer_link_token(
+        session["merchant_id"],
+        order_id,
+    )
+
+    if token is None:
+        flash("Could not create a link. The buyer may have already responded.")
+    else:
+        session["buyer_consent_link"] = url_for(
+            "orders.buyer_consent",
+            token=token,
+            _external=True,
+        )
+        flash("New buyer link created. Any older link no longer works.")
+
+    return redirect(url_for("orders.detail", order_id=order_id))

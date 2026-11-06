@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Consent Recorded - ClearSettle{% endblock %}
+
+{% block content %}
+
+<h1>Decision recorded</h1>
+
+{% if decision == "accepted" %}
+    <p>Your acknowledgment has been recorded.</p>
+{% else %}
+    <p>Your decision to decline has been recorded.</p>
+{% endif %}
+
+<p>
+    This records your acknowledgment of the ClearSettle
+    explanation only. It does not represent acceptance of
+    PayPal's legal terms or guarantee PayPal protection.
+</p>
+
+{% endblock %}

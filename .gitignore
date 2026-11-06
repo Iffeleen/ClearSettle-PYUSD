@@ -3,3 +3,6 @@ venv/
 __pycache__/
 uploads/
 .DS_Store
+*.backup
+*.pre-regen
+*.phase5-backup

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Order - ClearSettle{% endblock %}
+
+{% block content %}
+
+<h1>Order details</h1>
+
+<p>
+    <strong>Buyer:</strong>
+    {{ order.buyer_name }} ({{ order.buyer_email }})
+</p>
+
+<p><strong>Item:</strong> {{ order.description }}</p>
+
+<p>
+    <strong>Amount:</strong>
+    {{ order.amount_cents | money }} {{ order.currency }}
+</p>
+
+<p><strong>Status:</strong> {{ order.status }}</p>
+
+<p>
+    <strong>PayPal order:</strong>
+    {{ order.paypal_order_id or "Not paid yet" }}
+</p>
+
+<p>
+    <strong>Created:</strong>
+    {{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC
+</p>
+
+<hr>
+
+{% set consents = order.get("consents", {}) %}
+{% set merchant_consent = consents.get("merchant", {"status": "pending"}) %}
+{% set buyer_consent = consents.get("buyer", {"status": "pending"}) %}
+
+<h2>Consent records</h2>
+
+<h3>Merchant consent</h3>
+
+<p>
+    <strong>Status:</strong>
+    {{ merchant_consent.get("status", "pending") | title }}
+</p>
+
+{% if merchant_consent.get("timestamp") %}
+<p>
+    <strong>Recorded:</strong>
+    {{ merchant_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+</p>
+{% endif %}
+
+{% if merchant_consent.get("status", "pending") == "pending" %}
+
+    {% if policy %}
+
+        <h3>Buyer Protection explanation</h3>
+
+        <p>{{ policy.text_en }}</p>
+
+        <p><strong>Jurisdiction:</strong> {{ policy.jurisdiction }}</p>
+
+        <p>
+            <strong>Source:</strong>
+            <a href="{{ policy.source_url }}"
+               target="_blank"
+               rel="noopener noreferrer">
+                Official PayPal Buyer Protection page
+            </a>
+        </p>
+
+        <p>
+            By making a decision, you acknowledge that you reviewed
+            this ClearSettle explanation. This is not acceptance of
+            PayPal's legal terms and does not guarantee PayPal protection.
+        </p>
+
+        <form method="POST"
+              action="{{ url_for('orders.merchant_consent', order_id=order._id) }}">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token }}">
+
+            <button type="submit" name="decision" value="accepted">
+                Accept explanation
+            </button>
+
+            <button type="submit" name="decision" value="declined">
+                Decline
+            </button>
+
+        </form>
+
+    {% else %}
+
+        <p>The verified policy explanation is unavailable. Consent cannot be submitted.</p>
+
+    {% endif %}
+
+{% endif %}
+
+{% if buyer_consent_link %}
+
+    <hr>
+
+    <h3>Buyer consent link</h3>
+
+    <p>Copy this link and share it with the buyer manually.</p>
+
+    <p>
+        <a href="{{ buyer_consent_link }}">{{ buyer_consent_link }}</a>
+    </p>
+
+    <p>This link expires after 7 days and can be used for one decision.</p>
+
+{% endif %}
+
+{% if merchant_consent.get("status") == "accepted"
+      and buyer_consent.get("status", "pending") == "pending"
+      and not buyer_consent_link %}
+<form method="POST"
+      action="{{ url_for('orders.new_buyer_link', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Generate new buyer link</button>
+</form>
+{% endif %}
+
+<h3>Buyer consent</h3>
+
+<p>
+    <strong>Status:</strong>
+    {{ buyer_consent.get("status", "pending") | title }}
+</p>
+
+{% if buyer_consent.get("timestamp") %}
+<p>
+    <strong>Recorded:</strong>
+    {{ buyer_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+</p>
+{% endif %}
+
+<hr>
+
+<p>
+    <a href="{{ url_for('orders.index') }}">Back to orders</a>
+</p>
+
+{% endblock %}

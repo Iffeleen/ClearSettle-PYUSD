@@ -1,0 +1,26 @@
+[
+  {
+    "id": "seller_protection",
+    "title": "Seller Protection",
+    "text_en": "",
+    "source_url": "",
+    "jurisdiction": "US",
+    "verified": false
+  },
+  {
+    "id": "buyer_protection",
+    "title": "Buyer Protection",
+    "text_en": "Paraphrase of the supplied PayPal US Buyer Protection text: PayPal Purchase Protection may apply when a buyer does not receive an item or receives an item that is significantly different from what was ordered. Eligible claims may cover the purchase price and original shipping costs, where applicable. PayPal determines eligibility based on its applicable requirements, documentation provided, and other relevant information. Coverage is not automatic, and exclusions, deadlines, and other conditions apply.",
+    "source_url": "https://www.paypal.com/us/legalhub/paypal/buyer-protection?locale.x=en_US",
+    "jurisdiction": "US",
+    "verified": true
+  },
+  {
+    "id": "fees",
+    "title": "Fees",
+    "text_en": "",
+    "source_url": "",
+    "jurisdiction": "US",
+    "verified": false
+  }
+]

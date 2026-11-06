@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Orders - ClearSettle{% endblock %}
+{% block content %}
+<h1>Orders</h1>
+<p><a href="{{ url_for('orders.new') }}">+ New order</a> | <a href="{{ url_for('dashboard.index') }}">Dashboard</a></p>
+{% if orders %}
+<table>
+  <tr><th>Buyer</th><th>Description</th><th>Amount</th><th>Status</th></tr>
+  {% for order in orders %}
+  <tr>
+    <td><a href="{{ url_for('orders.detail', order_id=order['_id']) }}">{{ order.buyer_name }}</a></td>
+    <td>{{ order.description }}</td>
+    <td>{{ order.amount_cents | money }} {{ order.currency }}</td>
+    <td>{{ order.status }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No orders yet.</p>
+{% endif %}
+{% endblock %}

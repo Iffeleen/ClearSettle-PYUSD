@@ -51,3 +51,25 @@ def save_evidence(merchant_id, order_id, evidence_type, file_storage):
     }
     result = get_db().evidence.insert_one(doc)
     return result.inserted_id, None
+
+
+def list_evidence(merchant_id, order_id):
+    """Return all evidence records for an order the merchant owns."""
+    order = get_order(merchant_id, order_id)
+    if order is None:
+        return []
+    cursor = get_db().evidence.find({"order_id": order["_id"]}).sort("uploaded_at", 1)
+    return list(cursor)
+
+
+def readiness(evidence_list):
+    """Return (missing_types, label). Label is READY, PARTIAL or INSUFFICIENT."""
+    have = {e["evidence_type"] for e in evidence_list}
+    missing = [t for t in EVIDENCE_TYPES if t not in have]
+    if not missing:
+        label = "READY"
+    elif len(missing) == len(EVIDENCE_TYPES):
+        label = "INSUFFICIENT"
+    else:
+        label = "PARTIAL"
+    return missing, label

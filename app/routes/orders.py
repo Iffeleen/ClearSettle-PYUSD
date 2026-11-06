@@ -13,6 +13,7 @@ from flask import (
 )
 
 from app.services import order_service
+from app.services import evidence_service
 from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
 from app.utils.money import dollars_to_cents
@@ -94,8 +95,16 @@ def detail(order_id):
     # Show the newly generated buyer link only once.
     buyer_consent_link = session.pop("buyer_consent_link", None)
 
+    evidence_items = evidence_service.list_evidence(
+        session["merchant_id"], order_id
+    )
+    missing, readiness_label = evidence_service.readiness(evidence_items)
+
     return render_template(
         "order_detail.html",
+        evidence_items=evidence_items,
+        missing=missing,
+        readiness_label=readiness_label,
         order=order,
         policy=policy,
         csrf_token=csrf_token,
@@ -246,4 +255,28 @@ def new_buyer_link(order_id):
         )
         flash("New buyer link created. Any older link no longer works.")
 
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/evidence", methods=["POST"])
+@login_required
+def upload_evidence(order_id):
+    submitted_token = request.form.get("csrf_token", "")
+    stored_token = session.get("csrf_token", "")
+
+    if (
+        not submitted_token
+        or not stored_token
+        or not hmac.compare_digest(submitted_token, stored_token)
+    ):
+        abort(400)
+
+    evidence_id, error = evidence_service.save_evidence(
+        session["merchant_id"],
+        order_id,
+        request.form.get("evidence_type", ""),
+        request.files.get("file"),
+    )
+
+    flash(error or "Evidence uploaded and fingerprinted.")
     return redirect(url_for("orders.detail", order_id=order_id))

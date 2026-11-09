@@ -73,3 +73,19 @@ def readiness(evidence_list):
     else:
         label = "PARTIAL"
     return missing, label
+
+
+def verify_evidence(merchant_id, order_id):
+    """Recompute each file's SHA256 and compare with the stored hash.
+    Returns a list of (evidence_record, result) where result is
+    'match', 'MISMATCH' or 'missing'."""
+    results = []
+    for e in list_evidence(merchant_id, order_id):
+        path = UPLOAD_ROOT / str(e["order_id"]) / e["stored_name"]
+        if not path.is_file():
+            results.append((e, "missing"))
+        elif sha256_of_file(path) == e["sha256"]:
+            results.append((e, "match"))
+        else:
+            results.append((e, "MISMATCH"))
+    return results

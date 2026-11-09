@@ -197,6 +197,14 @@
 <p>No evidence uploaded yet.</p>
 {% endif %}
 
+{% if evidence_items %}
+<form method="POST" action="{{ url_for('orders.verify_evidence', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Verify evidence integrity</button>
+</form>
+<p><em>Checks that files are unchanged since upload. It does not prove the images are genuine.</em></p>
+{% endif %}
+
 <h3>Shipping details</h3>
 
 {% if order.get("shipping") %}

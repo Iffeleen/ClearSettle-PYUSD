@@ -359,3 +359,20 @@ def save_shipping(order_id):
         flash("Could not save. The order must be yours and already paid.")
 
     return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/verify-evidence", methods=["POST"])
+@login_required
+def verify_evidence(order_id):
+    submitted = request.form.get("csrf_token", "")
+    stored = session.get("csrf_token", "")
+    if not submitted or not stored or not hmac.compare_digest(submitted, stored):
+        abort(400)
+
+    results = evidence_service.verify_evidence(session["merchant_id"], order_id)
+    if not results:
+        flash("No evidence to verify.")
+    else:
+        for e, result in results:
+            flash(f"{e['evidence_type']} ({e['sha256'][:8]}...): {result}")
+    return redirect(url_for("orders.detail", order_id=order_id))

@@ -336,3 +336,26 @@ def pay(order_id):
         client_token=braintree_service.generate_client_token(),
         csrf_token=csrf_token,
     )
+
+
+@orders_bp.route("/orders/<order_id>/shipping", methods=["POST"])
+@login_required
+def save_shipping(order_id):
+    submitted = request.form.get("csrf_token", "")
+    stored = session.get("csrf_token", "")
+    if not submitted or not stored or not hmac.compare_digest(submitted, stored):
+        abort(400)
+
+    courier = request.form.get("courier", "").strip()
+    tracking = request.form.get("tracking_number", "").strip()
+
+    if not courier or len(courier) > 50:
+        flash("Enter the courier name (up to 50 characters).")
+    elif not (6 <= len(tracking) <= 40) or not tracking.replace("-", "").isalnum():
+        flash("Tracking number must be 6-40 letters, digits or hyphens.")
+    elif order_service.set_shipping(session["merchant_id"], order_id, courier, tracking):
+        flash("Shipping details saved.")
+    else:
+        flash("Could not save. The order must be yours and already paid.")
+
+    return redirect(url_for("orders.detail", order_id=order_id))

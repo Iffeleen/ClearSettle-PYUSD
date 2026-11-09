@@ -197,6 +197,28 @@
 <p>No evidence uploaded yet.</p>
 {% endif %}
 
+<h3>Shipping details</h3>
+
+{% if order.get("shipping") %}
+<p><strong>Courier:</strong> {{ order.shipping.courier }}</p>
+<p><strong>Tracking number:</strong> {{ order.shipping.tracking_number }}</p>
+{% endif %}
+
+{% if order.status == "paid" %}
+<form method="POST" action="{{ url_for('orders.save_shipping', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Courier
+        <input type="text" name="courier" maxlength="50" required>
+    </label>
+    <label>Tracking number
+        <input type="text" name="tracking_number" maxlength="40" required>
+    </label>
+    <button type="submit">Save shipping details</button>
+</form>
+{% else %}
+<p>Shipping details can be added after the order is paid.</p>
+{% endif %}
+
 <h3>Upload evidence</h3>
 
 <form method="POST"

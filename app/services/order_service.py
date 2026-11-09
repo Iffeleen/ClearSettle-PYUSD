@@ -220,3 +220,27 @@ def mark_order_paid(order_id, transaction_id, braintree_status):
     except InvalidId:
         return False
     return result.modified_count == 1
+
+
+def set_shipping(merchant_id, order_id, courier, tracking_number):
+    """Save courier and tracking number on a paid order the merchant owns."""
+    try:
+        result = get_db().orders.update_one(
+            {
+                "_id": ObjectId(order_id),
+                "merchant_id": ObjectId(merchant_id),
+                "status": "paid",
+            },
+            {
+                "$set": {
+                    "shipping": {
+                        "courier": courier,
+                        "tracking_number": tracking_number,
+                        "recorded_at": datetime.now(timezone.utc),
+                    }
+                }
+            },
+        )
+    except InvalidId:
+        return False
+    return result.matched_count == 1

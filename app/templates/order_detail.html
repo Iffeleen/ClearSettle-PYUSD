@@ -36,6 +36,19 @@
 {% set merchant_consent = consents.get("merchant", {"status": "pending"}) %}
 {% set buyer_consent = consents.get("buyer", {"status": "pending"}) %}
 
+<h2>Payment</h2>
+
+{% if order.get("payment") %}
+<p><strong>Provider:</strong> {{ order.payment.provider }}</p>
+<p><strong>Transaction ID:</strong> {{ order.payment.transaction_id }}</p>
+<p><strong>Provider status:</strong> {{ order.payment.provider_status }}</p>
+<p><strong>Paid:</strong> {{ order.payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
+{% elif order.status == "pending" %}
+<p><a href="{{ url_for('orders.pay', order_id=order._id) }}">Pay this order (sandbox)</a></p>
+{% endif %}
+
+<hr>
+
 <h2>Consent records</h2>
 
 <h3>Merchant consent</h3>

@@ -14,9 +14,10 @@ from flask import (
 
 from app.services import order_service
 from app.services import evidence_service
+from app.services import braintree_service
 from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
-from app.utils.money import dollars_to_cents
+from app.utils.money import dollars_to_cents, cents_to_dollars
 
 
 orders_bp = Blueprint("orders", __name__)
@@ -280,3 +281,58 @@ def upload_evidence(order_id):
 
     flash(error or "Evidence uploaded and fingerprinted.")
     return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/pay", methods=["GET", "POST"])
+@login_required
+def pay(order_id):
+    order = order_service.get_order(session["merchant_id"], order_id)
+    if order is None:
+        abort(404)
+
+    detail_url = url_for("orders.detail", order_id=order_id)
+
+    if order["status"] != "pending":
+        flash("This order is not waiting for payment.")
+        return redirect(detail_url)
+
+    buyer = order.get("consents", {}).get("buyer", {})
+    if buyer.get("status") != "accepted":
+        flash("The buyer must accept the consent explanation before payment.")
+        return redirect(detail_url)
+
+    csrf_token = session.setdefault("csrf_token", secrets.token_urlsafe(32))
+
+    if request.method == "POST":
+        submitted = request.form.get("csrf_token", "")
+        if not submitted or not hmac.compare_digest(submitted, csrf_token):
+            abort(400)
+
+        nonce = request.form.get("payment_method_nonce", "")
+        if not nonce:
+            flash("No payment method was provided.")
+            return redirect(url_for("orders.pay", order_id=order_id))
+
+        amount = cents_to_dollars(order["amount_cents"])
+        details, error = braintree_service.create_sale(amount, nonce)
+
+        if error:
+            flash("Payment failed: " + error)
+            return redirect(url_for("orders.pay", order_id=order_id))
+
+        saved = order_service.mark_order_paid(
+            order_id, details["transaction_id"], details["status"]
+        )
+        if saved:
+            flash("Sandbox payment successful.")
+        else:
+            flash("Payment went through but the order was not updated. "
+                  "Transaction ID: " + details["transaction_id"])
+        return redirect(detail_url)
+
+    return render_template(
+        "pay.html",
+        order=order,
+        client_token=braintree_service.generate_client_token(),
+        csrf_token=csrf_token,
+    )

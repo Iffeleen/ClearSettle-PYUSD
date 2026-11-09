@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Order - ClearSettle{% endblock %}
+
+{% block content %}
+
+<h1>Order details</h1>
+
+<p>
+    <strong>Buyer:</strong>
+    {{ order.buyer_name }} ({{ order.buyer_email }})
+</p>
+
+<p><strong>Item:</strong> {{ order.description }}</p>
+
+<p>
+    <strong>Amount:</strong>
+    {{ order.amount_cents | money }} {{ order.currency }}
+</p>
+
+<p><strong>Status:</strong> {{ order.status }}</p>
+
+<p>
+    <strong>PayPal order:</strong>
+    {{ order.paypal_order_id or "Not paid yet" }}
+</p>
+
+<p>
+    <strong>Created:</strong>
+    {{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC
+</p>
+
+<hr>
+
+{% set consents = order.get("consents", {}) %}
+{% set merchant_consent = consents.get("merchant", {"status": "pending"}) %}
+{% set buyer_consent = consents.get("buyer", {"status": "pending"}) %}
+
+<h2>Payment</h2>
+
+{% if order.get("payment") %}
+<p><strong>Provider:</strong> {{ order.payment.provider }}</p>
+<p><strong>Transaction ID:</strong> {{ order.payment.transaction_id }}</p>
+<p><strong>Provider status:</strong> {{ order.payment.provider_status }}</p>
+<p><strong>Paid:</strong> {{ order.payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
+{% elif order.status == "pending" %}
+<p><a href="{{ url_for('orders.pay', order_id=order._id) }}">Pay this order (sandbox)</a></p>
+{% endif %}
+
+<hr>
+
+<h2>Consent records</h2>
+
+<h3>Merchant consent</h3>
+
+<p>
+    <strong>Status:</strong>
+    {{ merchant_consent.get("status", "pending") | title }}
+</p>
+
+{% if merchant_consent.get("timestamp") %}
+<p>
+    <strong>Recorded:</strong>
+    {{ merchant_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+</p>
+{% endif %}
+
+{% if merchant_consent.get("status", "pending") == "pending" %}
+
+    {% if policy %}
+
+        <h3>Buyer Protection explanation</h3>
+
+        <p>{{ policy.text_en }}</p>
+
+        <p><strong>Jurisdiction:</strong> {{ policy.jurisdiction }}</p>
+
+        <p>
+            <strong>Source:</strong>
+            <a href="{{ policy.source_url }}"
+               target="_blank"
+               rel="noopener noreferrer">
+                Official PayPal Buyer Protection page
+            </a>
+        </p>
+
+        <p>
+            By making a decision, you acknowledge that you reviewed
+            this ClearSettle explanation. This is not acceptance of
+            PayPal's legal terms and does not guarantee PayPal protection.
+        </p>
+
+        <form method="POST"
+              action="{{ url_for('orders.merchant_consent', order_id=order._id) }}">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token }}">
+
+            <button type="submit" name="decision" value="accepted">
+                Accept explanation
+            </button>
+
+            <button type="submit" name="decision" value="declined">
+                Decline
+            </button>
+
+        </form>
+
+    {% else %}
+
+        <p>The verified policy explanation is unavailable. Consent cannot be submitted.</p>
+
+    {% endif %}
+
+{% endif %}
+
+{% if buyer_consent_link %}
+
+    <hr>
+
+    <h3>Buyer consent link</h3>
+
+    <p>Copy this link and share it with the buyer manually.</p>
+
+    <p>
+        <a href="{{ buyer_consent_link }}">{{ buyer_consent_link }}</a>
+    </p>
+
+    <p>This link expires after 7 days and can be used for one decision.</p>
+
+{% endif %}
+
+{% if merchant_consent.get("status") == "accepted"
+      and buyer_consent.get("status", "pending") == "pending"
+      and not buyer_consent_link %}
+<form method="POST"
+      action="{{ url_for('orders.new_buyer_link', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Generate new buyer link</button>
+</form>
+{% endif %}
+
+<h3>Buyer consent</h3>
+
+<p>
+    <strong>Status:</strong>
+    {{ buyer_consent.get("status", "pending") | title }}
+</p>
+
+{% if buyer_consent.get("timestamp") %}
+<p>
+    <strong>Recorded:</strong>
+    {{ buyer_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+</p>
+{% endif %}
+
+<hr>
+
+<p>
+    <a href="{{ url_for('orders.index') }}">Back to orders</a>
+</p>
+
+<hr>
+
+<h2>Evidence</h2>
+
+<p>
+    <strong>Completeness:</strong> {{ readiness_label }}
+    {% if missing %}
+        (missing: {{ missing | join(", ") }})
+    {% endif %}
+</p>
+
+<p>
+    This checks only that each required item was uploaded. It does not
+    judge the quality or authenticity of the images.
+</p>
+
+{% if evidence_items %}
+<table>
+  <tr>
+    <th>Type</th><th>Format</th><th>Size (bytes)</th>
+    <th>SHA256 (first 16)</th><th>Uploaded (UTC)</th>
+  </tr>
+  {% for e in evidence_items %}
+  <tr>
+    <td>{{ e.evidence_type }}</td>
+    <td>{{ e.file_type }}</td>
+    <td>{{ e.size_bytes }}</td>
+    <td>{{ e.sha256[:16] }}...</td>
+    <td>{{ e.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No evidence uploaded yet.</p>
+{% endif %}
+
+{% if evidence_items %}
+<form method="POST" action="{{ url_for('orders.verify_evidence', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Verify evidence integrity</button>
+</form>
+<p><em>Checks that files are unchanged since upload. It does not prove the images are genuine.</em></p>
+{% endif %}
+
+<h3>Shipping details</h3>
+
+{% if order.get("shipping") %}
+<p><strong>Courier:</strong> {{ order.shipping.courier }}</p>
+<p><strong>Tracking number:</strong> {{ order.shipping.tracking_number }}</p>
+{% endif %}
+
+{% if order.status == "paid" %}
+<form method="POST" action="{{ url_for('orders.save_shipping', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Courier
+        <input type="text" name="courier" maxlength="50" required>
+    </label>
+    <label>Tracking number
+        <input type="text" name="tracking_number" maxlength="40" required>
+    </label>
+    <button type="submit">Save shipping details</button>
+</form>
+{% else %}
+<p>Shipping details can be added after the order is paid.</p>
+{% endif %}
+
+<h3>Upload evidence</h3>
+
+<form method="POST"
+      action="{{ url_for('orders.upload_evidence', order_id=order._id) }}"
+      enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Evidence type
+        <select name="evidence_type" required>
+            <option value="packing_photo">Packing photo</option>
+            <option value="shipping_label">Shipping label</option>
+            <option value="delivery_proof">Delivery proof</option>
+        </select>
+    </label>
+    <label>Image (JPEG or PNG, max 5 MB)
+        <input type="file" name="file" accept="image/jpeg,image/png" required>
+    </label>
+    <button type="submit">Upload</button>
+</form>
+
+{% endblock %}

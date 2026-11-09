@@ -21,11 +21,6 @@
 <p><strong>Status:</strong> {{ order.status }}</p>
 
 <p>
-    <strong>PayPal order:</strong>
-    {{ order.paypal_order_id or "Not paid yet" }}
-</p>
-
-<p>
     <strong>Created:</strong>
     {{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC
 </p>

@@ -14,6 +14,7 @@ from flask import (
 
 from app.services import order_service
 from app.services import evidence_service
+from app.services import dispute_service
 from app.services import braintree_service
 from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
@@ -104,6 +105,7 @@ def detail(order_id):
     return render_template(
         "order_detail.html",
         evidence_items=evidence_items,
+        dispute=dispute_service.get_dispute(session["merchant_id"], order_id),
         missing=missing,
         readiness_label=readiness_label,
         order=order,
@@ -375,4 +377,43 @@ def verify_evidence(order_id):
     else:
         for e, result in results:
             flash(f"{e['evidence_type']} ({e['sha256'][:8]}...): {result}")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+def _check_csrf():
+    submitted = request.form.get("csrf_token", "")
+    stored = session.get("csrf_token", "")
+    if not submitted or not stored or not hmac.compare_digest(submitted, stored):
+        abort(400)
+
+
+@orders_bp.route("/orders/<order_id>/dispute/create", methods=["POST"])
+@login_required
+def dispute_create(order_id):
+    _check_csrf()
+    _, error = dispute_service.create_simulated_dispute(
+        session["merchant_id"], order_id, request.form.get("reason", "")
+    )
+    flash(error or "Simulated dispute created.")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/dispute/draft", methods=["POST"])
+@login_required
+def dispute_draft(order_id):
+    _check_csrf()
+    _, error = dispute_service.generate_draft(session["merchant_id"], order_id)
+    flash(error or "AI draft generated. Review and edit it before approving.")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/dispute/save", methods=["POST"])
+@login_required
+def dispute_save(order_id):
+    _check_csrf()
+    approve = request.form.get("action") == "approve"
+    _, message = dispute_service.save_response(
+        session["merchant_id"], order_id, request.form.get("response_text", ""), approve
+    )
+    flash(message)
     return redirect(url_for("orders.detail", order_id=order_id))

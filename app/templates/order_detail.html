@@ -241,4 +241,54 @@
     <button type="submit">Upload</button>
 </form>
 
+<hr>
+
+<h2>Dispute (simulated)</h2>
+
+<p><em>Demo only: no real PayPal or Braintree dispute exists. Nothing is sent
+to PayPal, and the deadline below is a demo value, not a PayPal deadline.</em></p>
+
+{% if not dispute %}
+    {% if order.status == "paid" %}
+    <form method="POST" action="{{ url_for('orders.dispute_create', order_id=order._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Simulated dispute reason
+            <select name="reason">
+                <option value="item_not_received">Item not received</option>
+                <option value="item_not_as_described">Item not as described</option>
+            </select>
+        </label>
+        <button type="submit">Create simulated dispute</button>
+    </form>
+    {% else %}
+    <p>A dispute can be simulated only on a paid order.</p>
+    {% endif %}
+{% else %}
+    <p><strong>Reason:</strong> {{ dispute.reason }}</p>
+    <p><strong>Status:</strong> {{ dispute.status }}</p>
+    <p><strong>Demo deadline:</strong> {{ dispute.demo_deadline.strftime("%Y-%m-%d") }}</p>
+
+    {% if dispute.status == "open" %}
+    <form method="POST" action="{{ url_for('orders.dispute_draft', order_id=order._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Generate AI draft</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('orders.dispute_save', order_id=order._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Response (edit as needed)
+            <textarea name="response_text" rows="12" style="width:100%">{{ dispute.edited_response or dispute.draft_response or "" }}</textarea>
+        </label>
+        <p><em>The draft is AI-generated from this order's recorded data. Check every
+        statement before approving. Nothing is final until you approve.</em></p>
+        <button type="submit" name="action" value="save">Save draft</button>
+        <button type="submit" name="action" value="approve">Approve and submit (simulated)</button>
+    </form>
+    {% else %}
+    <p><strong>Approved by merchant:</strong> {{ dispute.approved_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC (simulated, not sent to PayPal)</p>
+    <p><strong>Final response:</strong></p>
+    <p style="white-space: pre-wrap">{{ dispute.final_response }}</p>
+    {% endif %}
+{% endif %}
+
 {% endblock %}

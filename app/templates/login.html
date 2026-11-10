@@ -1,11 +1,11 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 {% block title %}Log in - ClearSettle{% endblock %}
 {% block content %}
 <h1>Merchant login</h1>
 <p class="muted">Welcome back. Log in to manage your orders.</p>
 <form method="post">
-  <label>Email
-    <input type="email" name="email" required>
+  <label>Username or email
+    <input type="text" name="email" required autofocus autocapitalize="none">
   </label>
   <label>Password
     <input type="password" name="password" required>

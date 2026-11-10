@@ -29,9 +29,24 @@
 
     <div class="spacer"></div>
     <div class="sandbox-tag">Sandbox &amp; simulation mode<br>No real money moves</div>
-    <form method="post" action="{{ url_for('auth.logout') }}">
-      <button type="submit" class="nav-btn">🚪 Log out</button>
-    </form>
+    {% if current_merchant %}
+    {% set dn = current_merchant.get('name') or current_merchant.email %}
+    <details class="profile">
+      <summary class="profile-chip">
+        <span class="avatar">{{ dn.split()[:2] | map('first') | join | upper }}</span>
+        <span class="who"><strong>{{ dn }}</strong><small>{{ current_merchant.email }}</small></span>
+      </summary>
+      <div class="profile-menu neu">
+        {% if current_merchant.username %}<div class="pm-row"><span>Username</span><strong>@{{ current_merchant.username }}</strong></div>{% endif %}
+        <div class="pm-row"><span>Business ID</span><strong>{{ current_merchant.business_id }}</strong></div>
+        <div class="pm-row"><span>Business</span><strong>{{ current_merchant.get('business_name') or '-' }}</strong></div>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" name="switch" value="1" class="nav-btn">🔁 Switch account</button>
+          <button type="submit" class="nav-btn">🚪 Log out</button>
+        </form>
+      </div>
+    </details>
+    {% endif %}
   </aside>
   <main class="content">
 {% else %}

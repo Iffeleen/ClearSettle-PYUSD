@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ClearSettle{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+  <div class="auth-wrap">
+    <section class="auth-brand neu">
+      <div class="brand">ClearSettle</div>
+      <h1>Clear vision on policies. Organized evidence. Disputes only with your approval.</h1>
+      <p class="muted">Explain buyer protection in plain language, collect delivery evidence, and review AI-drafted dispute replies before anything is sent.</p>
+      <div class="sandbox-tag">Sandbox &amp; simulation mode<br>No real money moves</div>
+    </section>
+    <section class="auth-form neu">
+      {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+          <p class="flash">{{ message }}</p>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </section>
+  </div>
+</body>
+</html>

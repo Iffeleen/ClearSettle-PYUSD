@@ -1,11 +1,45 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 {% block title %}Register - ClearSettle{% endblock %}
 {% block content %}
 <h1>Create merchant account</h1>
-<p class="muted">It takes a minute. Passwords are stored hashed.</p>
+<p class="muted">Tell us about you and your business. Your password is stored hashed.</p>
 <form method="post">
-  <label>Email
-    <input type="email" name="email" required>
+  <div class="row2">
+    <label>Full name
+      <input type="text" name="name" maxlength="100" value="{{ form.get('name', '') }}" required>
+    </label>
+    <label>Email
+      <input type="email" name="email" maxlength="254" value="{{ form.get('email', '') }}" required>
+    </label>
+  </div>
+  <div class="row2">
+    <label>Phone number
+      <input type="tel" name="phone" maxlength="20" placeholder="+8801XXXXXXXXX" value="{{ form.get('phone', '') }}" required>
+    </label>
+    <label>Country
+      <select name="country" required>
+        <option value="" disabled {{ 'selected' if not form.get('country') }}>Select country</option>
+        {% for c in countries %}
+        <option value="{{ c }}" {{ 'selected' if form.get('country') == c }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="row2">
+    <label>Business type
+      <select name="business_type" required>
+        <option value="" disabled {{ 'selected' if not form.get('business_type') }}>Select type</option>
+        {% for t in business_types %}
+        <option value="{{ t }}" {{ 'selected' if form.get('business_type') == t }}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Business name
+      <input type="text" name="business_name" maxlength="100" value="{{ form.get('business_name', '') }}" required>
+    </label>
+  </div>
+  <label>Username (letters, numbers, . or _)
+    <input type="text" name="username" minlength="3" maxlength="30" autocapitalize="none" value="{{ form.get('username', '') }}" required>
   </label>
   <label>Password (8+ characters)
     <input type="password" name="password" minlength="8" required>

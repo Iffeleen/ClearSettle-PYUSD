@@ -7,3 +7,4 @@ uploads/
 *.pre-regen
 *.phase5-backup
 *.pre-evidence
+*.pre-*

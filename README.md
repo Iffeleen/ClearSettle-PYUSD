@@ -86,7 +86,8 @@ a Gemini API key.
     # edit .env with your own keys
     python run.py
 
-Open http://127.0.0.1:5001, register a merchant, and create an order.
+When `python run.py` starts, your browser opens the login page. If it does not, open `http://127.0.0.1:5001/login` yourself. This address only works on your own computer while the app is running. It is not a public website.
+Register a merchant, and create an order.
 Sandbox test card: 4111 1111 1111 1111 with any future expiry date.
 Some sandbox amounts (roughly 2000 to 2999) are declined on purpose by Braintree.
 

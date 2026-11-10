@@ -62,11 +62,11 @@ not guarantee PayPal protection. The official PayPal page is the authority.</em>
 <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-    <button type="submit" name="decision" value="accepted">
+    <button type="submit" name="decision" value="accepted" class="btn-primary">
         Accept explanation
     </button>
 
-    <button type="submit" name="decision" value="declined">
+    <button type="submit" name="decision" value="declined" class="btn-danger">
         Decline
     </button>
 </form>

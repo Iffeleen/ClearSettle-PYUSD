@@ -244,3 +244,39 @@ def set_shipping(merchant_id, order_id, courier, tracking_number):
     except InvalidId:
         return False
     return result.matched_count == 1
+
+
+def filter_orders(merchant_id, orders, name):
+    """Narrow a merchant's order list for the sidebar buttons.
+    name is one of: unpaid, paid, disputes, settled (anything else = all)."""
+    if name == "unpaid":
+        return [o for o in orders if o["status"] == "pending"]
+    if name == "paid":
+        return [o for o in orders if o["status"] == "paid"]
+    if name == "settled":
+        return [o for o in orders if o.get("settlement")]
+    if name == "disputes":
+        ids = {
+            d["order_id"]
+            for d in get_db().disputes.find(
+                {"merchant_id": ObjectId(merchant_id)}, {"order_id": 1}
+            )
+        }
+        return [o for o in orders if o["_id"] in ids]
+    return orders
+
+
+def dashboard_stats(merchant_id, orders):
+    """Simple counts for the dashboard cards."""
+    open_disputes = get_db().disputes.count_documents(
+        {"merchant_id": ObjectId(merchant_id), "status": "open"}
+    )
+    paid = [o for o in orders if o["status"] == "paid"]
+    return {
+        "total": len(orders),
+        "awaiting": sum(1 for o in orders if o["status"] == "pending"),
+        "paid": len(paid),
+        "paid_cents": sum(o["amount_cents"] for o in paid),
+        "open_disputes": open_disputes,
+        "settled": sum(1 for o in orders if o.get("settlement")),
+    }

@@ -12,7 +12,7 @@
 <form id="pay-form" method="POST">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="payment_method_nonce" id="nonce">
-  <button type="submit" id="pay-button" disabled>Pay</button>
+  <button type="submit" id="pay-button" class="btn-primary" disabled>Pay</button>
 </form>
 
 <p><a href="{{ url_for('orders.detail', order_id=order._id) }}">Back to order</a></p>

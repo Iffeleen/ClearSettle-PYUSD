@@ -257,6 +257,28 @@ not guarantee PayPal protection. The official PayPal page is the authority.</em>
 
 <hr>
 
+<h2>Settlement (simulated)</h2>
+
+<p><em>Prototype simulation: no PYUSD is transferred, and there is no wallet or
+blockchain transaction. The buyer paid by sandbox card through Braintree.</em></p>
+
+{% if order.get("settlement") %}
+<p><strong>Asset:</strong> {{ order.settlement.asset }} (simulated)</p>
+<p><strong>Amount:</strong> {{ order.settlement.amount }}</p>
+<p><strong>Simulation reference:</strong> {{ order.settlement.reference }}
+   (not a blockchain transaction)</p>
+<p><strong>Recorded:</strong> {{ order.settlement.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
+{% elif order.status == "paid" %}
+<form method="POST" action="{{ url_for('orders.settle', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Run simulated PYUSD settlement</button>
+</form>
+{% else %}
+<p>Settlement is available after payment.</p>
+{% endif %}
+
+<hr>
+
 <h2>Dispute (simulated)</h2>
 
 <p><em>Demo only: no real PayPal or Braintree dispute exists. Nothing is sent

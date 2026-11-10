@@ -16,6 +16,7 @@ from app.services import order_service
 from app.services import ai_service
 from app.services import evidence_service
 from app.services import dispute_service
+from app.services import settlement_service
 from app.services import braintree_service
 from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
@@ -436,3 +437,12 @@ def _explanations(policy):
         if text:
             result[lang] = text
     return result
+
+
+@orders_bp.route("/orders/<order_id>/settle", methods=["POST"])
+@login_required
+def settle(order_id):
+    _check_csrf()
+    _, message = settlement_service.settle_simulated(session["merchant_id"], order_id)
+    flash(message)
+    return redirect(url_for("orders.detail", order_id=order_id))

@@ -1,21 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Orders - ClearSettle{% endblock %}
 {% block content %}
-<h1>Orders</h1>
-<p><a href="{{ url_for('orders.new') }}">+ New order</a> | <a href="{{ url_for('dashboard.index') }}">Dashboard</a></p>
+{% set titles = {'unpaid': 'Awaiting payment', 'paid': 'Paid orders', 'disputes': 'Orders with disputes (simulated)', 'settled': 'Settled orders (simulated)'} %}
+<div class="page-head">
+  <h1>{{ titles.get(current, 'All orders') }}</h1>
+  <p><a class="btn btn-primary" href="{{ url_for('orders.new') }}">+ New order</a></p>
+</div>
 {% if orders %}
 <table>
-  <tr><th>Buyer</th><th>Description</th><th>Amount</th><th>Status</th></tr>
+  <tr><th>Buyer</th><th>Item</th><th>Amount</th><th>Status</th><th></th></tr>
   {% for order in orders %}
   <tr>
-    <td><a href="{{ url_for('orders.detail', order_id=order['_id']) }}">{{ order.buyer_name }}</a></td>
+    <td>{{ order.buyer_name }}</td>
     <td>{{ order.description }}</td>
     <td>{{ order.amount_cents | money }} {{ order.currency }}</td>
-    <td>{{ order.status }}</td>
+    <td><span class="badge badge-{{ order.status }}">{{ order.status }}</span></td>
+    <td><a class="btn" href="{{ url_for('orders.detail', order_id=order['_id']) }}">Open</a></td>
   </tr>
   {% endfor %}
 </table>
 {% else %}
-<p>No orders yet.</p>
+<div class="card inset">Nothing here yet.</div>
 {% endif %}
 {% endblock %}

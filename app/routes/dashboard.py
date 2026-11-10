@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, session, redirect, url_for
-from app.services import auth_service
+from app.services import auth_service, order_service
 from app.utils.auth import login_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -12,4 +12,10 @@ def index():
     if merchant is None:
         session.clear()
         return redirect(url_for("auth.login"))
-    return render_template("dashboard.html", merchant=merchant)
+    orders = order_service.list_orders(session["merchant_id"])
+    return render_template(
+        "dashboard.html",
+        merchant=merchant,
+        stats=order_service.dashboard_stats(session["merchant_id"], orders),
+        recent=orders[:5],
+    )

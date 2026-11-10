@@ -2,6 +2,7 @@
 {% block title %}Register - ClearSettle{% endblock %}
 {% block content %}
 <h1>Create merchant account</h1>
+<p class="muted">It takes a minute. Passwords are stored hashed.</p>
 <form method="post">
   <label>Email
     <input type="email" name="email" required>
@@ -9,6 +10,7 @@
   <label>Password (8+ characters)
     <input type="password" name="password" minlength="8" required>
   </label>
-  <button type="submit">Register</button>
+  <button type="submit" class="btn-primary">Register</button>
+  <a class="btn" href="{{ url_for('auth.login') }}">I have an account</a>
 </form>
 {% endblock %}

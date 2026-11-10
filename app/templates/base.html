@@ -2,17 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}ClearSettle{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-  <main>
+{% set logged_in = session.get('merchant_id') %}
+{% set ep = request.endpoint or '' %}
+{% set flt = request.args.get('filter', '') %}
+<body class="{{ 'app' if logged_in else 'public' }}">
+{% if logged_in %}
+<div class="shell">
+  <aside class="sidebar neu">
+    <div class="brand">ClearSettle</div>
+
+    <a class="nav-btn {{ 'active' if ep == 'dashboard.index' }}" href="{{ url_for('dashboard.index') }}">🏠 Dashboard</a>
+
+    <div class="nav-group">Orders</div>
+    <a class="nav-btn {{ 'active' if ep == 'orders.new' }}" href="{{ url_for('orders.new') }}">➕ New order</a>
+    <a class="nav-btn {{ 'active' if ep == 'orders.index' and not flt }}" href="{{ url_for('orders.index') }}">📦 All orders</a>
+    <a class="nav-btn {{ 'active' if flt == 'unpaid' }}" href="{{ url_for('orders.index', filter='unpaid') }}">⏳ Awaiting payment</a>
+    <a class="nav-btn {{ 'active' if flt == 'paid' }}" href="{{ url_for('orders.index', filter='paid') }}">💳 Paid</a>
+
+    <div class="nav-group">Protection</div>
+    <a class="nav-btn {{ 'active' if flt == 'disputes' }}" href="{{ url_for('orders.index', filter='disputes') }}">⚖️ Disputes</a>
+    <a class="nav-btn {{ 'active' if flt == 'settled' }}" href="{{ url_for('orders.index', filter='settled') }}">💰 Settlements</a>
+
+    <div class="spacer"></div>
+    <div class="sandbox-tag">Sandbox &amp; simulation mode<br>No real money moves</div>
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <button type="submit" class="nav-btn">🚪 Log out</button>
+    </form>
+  </aside>
+  <main class="content">
+{% else %}
+<main>
+  <div class="brand-top">ClearSettle</div>
+  <div class="card">
+{% endif %}
     {% with messages = get_flashed_messages() %}
       {% for message in messages %}
         <p class="flash">{{ message }}</p>
       {% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
+{% if logged_in %}
   </main>
+</div>
+{% else %}
+  </div>
+</main>
+{% endif %}
 </body>
 </html>

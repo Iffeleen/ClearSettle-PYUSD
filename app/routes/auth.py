@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from app.services import auth_service
+from app.utils import ratelimit
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -26,10 +27,16 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
+        throttle_key = (request.remote_addr or "?") + "|" + email.lower()
+        if ratelimit.is_blocked(throttle_key):
+            flash("Too many failed attempts. Try again in a few minutes.")
+            return render_template("login.html"), 429
         merchant = auth_service.authenticate_merchant(email, password)
         if merchant is None:
+            ratelimit.record_failure(throttle_key)
             flash("Invalid email or password.")
         else:
+            ratelimit.clear(throttle_key)
             session.clear()
             session["merchant_id"] = str(merchant["_id"])
             return redirect(url_for("dashboard.index"))

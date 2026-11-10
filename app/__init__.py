@@ -20,4 +20,8 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(orders_bp)
 
+    @app.errorhandler(413)
+    def too_large(error):
+        return "File too large. The maximum upload size is 5 MB.", 413
+
     return app

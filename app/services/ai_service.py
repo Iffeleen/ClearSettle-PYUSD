@@ -89,3 +89,38 @@ def build_dispute_prompt(facts, reason):
         "Write the draft reply to the buyer's claim."
     )
     return DISPUTE_RULES, user_message
+
+
+def get_explanation(policy_id, language):
+    """Return (text, error). Generated once, then cached in MongoDB."""
+    import hashlib
+    from datetime import datetime, timezone
+
+    import requests
+
+    from app.db import get_db
+
+    try:
+        system, user = build_policy_prompt(policy_id, language)
+    except ValueError as e:
+        return None, str(e)
+
+    key = hashlib.sha256((policy_id + language + user).encode("utf-8")).hexdigest()
+    col = get_db().policy_explanations
+    cached = col.find_one({"_id": key})
+    if cached:
+        return cached["text"], None
+
+    try:
+        text = call_llm(system, user)
+    except (RuntimeError, requests.exceptions.RequestException):
+        return None, "AI explanation unavailable right now."
+
+    col.insert_one({
+        "_id": key,
+        "policy_id": policy_id,
+        "language": language,
+        "text": text,
+        "created_at": datetime.now(timezone.utc),
+    })
+    return text, None

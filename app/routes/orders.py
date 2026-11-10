@@ -13,6 +13,7 @@ from flask import (
 )
 
 from app.services import order_service
+from app.services import ai_service
 from app.services import evidence_service
 from app.services import dispute_service
 from app.services import braintree_service
@@ -106,6 +107,11 @@ def detail(order_id):
         "order_detail.html",
         evidence_items=evidence_items,
         dispute=dispute_service.get_dispute(session["merchant_id"], order_id),
+        explanations=(
+            _explanations(policy)
+            if order.get("consents", {}).get("merchant", {}).get("status", "pending") == "pending"
+            else {}
+        ),
         missing=missing,
         readiness_label=readiness_label,
         order=order,
@@ -224,6 +230,7 @@ def buyer_consent(token):
         order=order,
         policy=policy,
         csrf_token=csrf_token,
+        explanations=_explanations(policy),
     )
 
 
@@ -417,3 +424,15 @@ def dispute_save(order_id):
     )
     flash(message)
     return redirect(url_for("orders.detail", order_id=order_id))
+
+
+def _explanations(policy):
+    """English and Bengali AI explanations of a verified policy (cached)."""
+    if not policy:
+        return {}
+    result = {}
+    for lang in ("en", "bn"):
+        text, _ = ai_service.get_explanation(policy["id"], lang)
+        if text:
+            result[lang] = text
+    return result

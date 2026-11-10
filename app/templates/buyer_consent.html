@@ -46,6 +46,19 @@
     PayPal's legal terms and does not guarantee PayPal protection.
 </p>
 
+
+{% if explanations %}
+<h3>Simple explanation (AI-generated)</h3>
+{% for lang, label in [("en", "English"), ("bn", "বাংলা")] %}
+  {% if explanations.get(lang) %}
+  <p><strong>{{ label }}</strong></p>
+  <p style="white-space: pre-wrap">{{ explanations[lang] }}</p>
+  {% endif %}
+{% endfor %}
+<p><em>AI-generated from the verified text above. It is not legal advice and does
+not guarantee PayPal protection. The official PayPal page is the authority.</em></p>
+{% endif %}
+
 <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 

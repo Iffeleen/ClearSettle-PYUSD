@@ -21,11 +21,6 @@
 <p><strong>Status:</strong> {{ order.status }}</p>
 
 <p>
-    <strong>PayPal order:</strong>
-    {{ order.paypal_order_id or "Not paid yet" }}
-</p>
-
-<p>
     <strong>Created:</strong>
     {{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC
 </p>
@@ -35,6 +30,19 @@
 {% set consents = order.get("consents", {}) %}
 {% set merchant_consent = consents.get("merchant", {"status": "pending"}) %}
 {% set buyer_consent = consents.get("buyer", {"status": "pending"}) %}
+
+<h2>Payment</h2>
+
+{% if order.get("payment") %}
+<p><strong>Provider:</strong> {{ order.payment.provider }}</p>
+<p><strong>Transaction ID:</strong> {{ order.payment.transaction_id }}</p>
+<p><strong>Provider status:</strong> {{ order.payment.provider_status }}</p>
+<p><strong>Paid:</strong> {{ order.payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
+{% elif order.status == "pending" %}
+<p><a href="{{ url_for('orders.pay', order_id=order._id) }}">Pay this order (sandbox)</a></p>
+{% endif %}
+
+<hr>
 
 <h2>Consent records</h2>
 
@@ -61,6 +69,20 @@
         <p>{{ policy.text_en }}</p>
 
         <p><strong>Jurisdiction:</strong> {{ policy.jurisdiction }}</p>
+
+{% if explanations %}
+<h3>Simple explanation (AI-generated)</h3>
+{% for lang, label in [("en", "English"), ("bn", "বাংলা")] %}
+  {% if explanations.get(lang) %}
+  <p><strong>{{ label }}</strong></p>
+  <p style="white-space: pre-wrap">{{ explanations[lang] }}</p>
+  {% endif %}
+{% endfor %}
+<p><em>AI-generated from the verified text above. It is not legal advice and does
+not guarantee PayPal protection. The official PayPal page is the authority.</em></p>
+{% endif %}
+
+
 
         <p>
             <strong>Source:</strong>
@@ -147,5 +169,140 @@
 <p>
     <a href="{{ url_for('orders.index') }}">Back to orders</a>
 </p>
+
+<hr>
+
+<h2>Evidence</h2>
+
+<p>
+    <strong>Completeness:</strong> {{ readiness_label }}
+    {% if missing %}
+        (missing: {{ missing | join(", ") }})
+    {% endif %}
+</p>
+
+<p>
+    This checks only that each required item was uploaded. It does not
+    judge the quality or authenticity of the images.
+</p>
+
+{% if evidence_items %}
+<table>
+  <tr>
+    <th>Type</th><th>Format</th><th>Size (bytes)</th>
+    <th>SHA256 (first 16)</th><th>Uploaded (UTC)</th>
+  </tr>
+  {% for e in evidence_items %}
+  <tr>
+    <td>{{ e.evidence_type }}</td>
+    <td>{{ e.file_type }}</td>
+    <td>{{ e.size_bytes }}</td>
+    <td>{{ e.sha256[:16] }}...</td>
+    <td>{{ e.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No evidence uploaded yet.</p>
+{% endif %}
+
+{% if evidence_items %}
+<form method="POST" action="{{ url_for('orders.verify_evidence', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Verify evidence integrity</button>
+</form>
+<p><em>Checks that files are unchanged since upload. It does not prove the images are genuine.</em></p>
+{% endif %}
+
+<h3>Shipping details</h3>
+
+{% if order.get("shipping") %}
+<p><strong>Courier:</strong> {{ order.shipping.courier }}</p>
+<p><strong>Tracking number:</strong> {{ order.shipping.tracking_number }}</p>
+{% endif %}
+
+{% if order.status == "paid" %}
+<form method="POST" action="{{ url_for('orders.save_shipping', order_id=order._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Courier
+        <input type="text" name="courier" maxlength="50" required>
+    </label>
+    <label>Tracking number
+        <input type="text" name="tracking_number" maxlength="40" required>
+    </label>
+    <button type="submit">Save shipping details</button>
+</form>
+{% else %}
+<p>Shipping details can be added after the order is paid.</p>
+{% endif %}
+
+<h3>Upload evidence</h3>
+
+<form method="POST"
+      action="{{ url_for('orders.upload_evidence', order_id=order._id) }}"
+      enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Evidence type
+        <select name="evidence_type" required>
+            <option value="packing_photo">Packing photo</option>
+            <option value="shipping_label">Shipping label</option>
+            <option value="delivery_proof">Delivery proof</option>
+        </select>
+    </label>
+    <label>Image (JPEG or PNG, max 5 MB)
+        <input type="file" name="file" accept="image/jpeg,image/png" required>
+    </label>
+    <button type="submit">Upload</button>
+</form>
+
+<hr>
+
+<h2>Dispute (simulated)</h2>
+
+<p><em>Demo only: no real PayPal or Braintree dispute exists. Nothing is sent
+to PayPal, and the deadline below is a demo value, not a PayPal deadline.</em></p>
+
+{% if not dispute %}
+    {% if order.status == "paid" %}
+    <form method="POST" action="{{ url_for('orders.dispute_create', order_id=order._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Simulated dispute reason
+            <select name="reason">
+                <option value="item_not_received">Item not received</option>
+                <option value="item_not_as_described">Item not as described</option>
+            </select>
+        </label>
+        <button type="submit">Create simulated dispute</button>
+    </form>
+    {% else %}
+    <p>A dispute can be simulated only on a paid order.</p>
+    {% endif %}
+{% else %}
+    <p><strong>Reason:</strong> {{ dispute.reason }}</p>
+    <p><strong>Status:</strong> {{ dispute.status }}</p>
+    <p><strong>Demo deadline:</strong> {{ dispute.demo_deadline.strftime("%Y-%m-%d") }}</p>
+
+    {% if dispute.status == "open" %}
+    <form method="POST" action="{{ url_for('orders.dispute_draft', order_id=order._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Generate AI draft</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('orders.dispute_save', order_id=order._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Response (edit as needed)
+            <textarea name="response_text" rows="12" style="width:100%">{{ dispute.edited_response or dispute.draft_response or "" }}</textarea>
+        </label>
+        <p><em>The draft is AI-generated from this order's recorded data. Check every
+        statement before approving. Nothing is final until you approve.</em></p>
+        <button type="submit" name="action" value="save">Save draft</button>
+        <button type="submit" name="action" value="approve">Approve and submit (simulated)</button>
+    </form>
+    {% else %}
+    <p><strong>Approved by merchant:</strong> {{ dispute.approved_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC (simulated, not sent to PayPal)</p>
+    <p><strong>Final response:</strong></p>
+    <p style="white-space: pre-wrap">{{ dispute.final_response }}</p>
+    {% endif %}
+{% endif %}
 
 {% endblock %}

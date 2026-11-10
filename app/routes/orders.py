@@ -13,9 +13,13 @@ from flask import (
 )
 
 from app.services import order_service
+from app.services import ai_service
+from app.services import evidence_service
+from app.services import dispute_service
+from app.services import braintree_service
 from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
-from app.utils.money import dollars_to_cents
+from app.utils.money import dollars_to_cents, cents_to_dollars
 
 
 orders_bp = Blueprint("orders", __name__)
@@ -94,8 +98,22 @@ def detail(order_id):
     # Show the newly generated buyer link only once.
     buyer_consent_link = session.pop("buyer_consent_link", None)
 
+    evidence_items = evidence_service.list_evidence(
+        session["merchant_id"], order_id
+    )
+    missing, readiness_label = evidence_service.readiness(evidence_items)
+
     return render_template(
         "order_detail.html",
+        evidence_items=evidence_items,
+        dispute=dispute_service.get_dispute(session["merchant_id"], order_id),
+        explanations=(
+            _explanations(policy)
+            if order.get("consents", {}).get("merchant", {}).get("status", "pending") == "pending"
+            else {}
+        ),
+        missing=missing,
+        readiness_label=readiness_label,
         order=order,
         policy=policy,
         csrf_token=csrf_token,
@@ -212,6 +230,7 @@ def buyer_consent(token):
         order=order,
         policy=policy,
         csrf_token=csrf_token,
+        explanations=_explanations(policy),
     )
 
 
@@ -247,3 +266,173 @@ def new_buyer_link(order_id):
         flash("New buyer link created. Any older link no longer works.")
 
     return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/evidence", methods=["POST"])
+@login_required
+def upload_evidence(order_id):
+    submitted_token = request.form.get("csrf_token", "")
+    stored_token = session.get("csrf_token", "")
+
+    if (
+        not submitted_token
+        or not stored_token
+        or not hmac.compare_digest(submitted_token, stored_token)
+    ):
+        abort(400)
+
+    evidence_id, error = evidence_service.save_evidence(
+        session["merchant_id"],
+        order_id,
+        request.form.get("evidence_type", ""),
+        request.files.get("file"),
+    )
+
+    flash(error or "Evidence uploaded and fingerprinted.")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/pay", methods=["GET", "POST"])
+@login_required
+def pay(order_id):
+    order = order_service.get_order(session["merchant_id"], order_id)
+    if order is None:
+        abort(404)
+
+    detail_url = url_for("orders.detail", order_id=order_id)
+
+    if order["status"] != "pending":
+        flash("This order is not waiting for payment.")
+        return redirect(detail_url)
+
+    buyer = order.get("consents", {}).get("buyer", {})
+    if buyer.get("status") != "accepted":
+        flash("The buyer must accept the consent explanation before payment.")
+        return redirect(detail_url)
+
+    csrf_token = session.setdefault("csrf_token", secrets.token_urlsafe(32))
+
+    if request.method == "POST":
+        submitted = request.form.get("csrf_token", "")
+        if not submitted or not hmac.compare_digest(submitted, csrf_token):
+            abort(400)
+
+        nonce = request.form.get("payment_method_nonce", "")
+        if not nonce:
+            flash("No payment method was provided.")
+            return redirect(url_for("orders.pay", order_id=order_id))
+
+        amount = cents_to_dollars(order["amount_cents"])
+        details, error = braintree_service.create_sale(amount, nonce)
+
+        if error:
+            flash("Payment failed: " + error)
+            return redirect(url_for("orders.pay", order_id=order_id))
+
+        saved = order_service.mark_order_paid(
+            order_id, details["transaction_id"], details["status"]
+        )
+        if saved:
+            flash("Sandbox payment successful.")
+        else:
+            flash("Payment went through but the order was not updated. "
+                  "Transaction ID: " + details["transaction_id"])
+        return redirect(detail_url)
+
+    return render_template(
+        "pay.html",
+        order=order,
+        client_token=braintree_service.generate_client_token(),
+        csrf_token=csrf_token,
+    )
+
+
+@orders_bp.route("/orders/<order_id>/shipping", methods=["POST"])
+@login_required
+def save_shipping(order_id):
+    submitted = request.form.get("csrf_token", "")
+    stored = session.get("csrf_token", "")
+    if not submitted or not stored or not hmac.compare_digest(submitted, stored):
+        abort(400)
+
+    courier = request.form.get("courier", "").strip()
+    tracking = request.form.get("tracking_number", "").strip()
+
+    if not courier or len(courier) > 50:
+        flash("Enter the courier name (up to 50 characters).")
+    elif not (6 <= len(tracking) <= 40) or not tracking.replace("-", "").isalnum():
+        flash("Tracking number must be 6-40 letters, digits or hyphens.")
+    elif order_service.set_shipping(session["merchant_id"], order_id, courier, tracking):
+        flash("Shipping details saved.")
+    else:
+        flash("Could not save. The order must be yours and already paid.")
+
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/verify-evidence", methods=["POST"])
+@login_required
+def verify_evidence(order_id):
+    submitted = request.form.get("csrf_token", "")
+    stored = session.get("csrf_token", "")
+    if not submitted or not stored or not hmac.compare_digest(submitted, stored):
+        abort(400)
+
+    results = evidence_service.verify_evidence(session["merchant_id"], order_id)
+    if not results:
+        flash("No evidence to verify.")
+    else:
+        for e, result in results:
+            flash(f"{e['evidence_type']} ({e['sha256'][:8]}...): {result}")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+def _check_csrf():
+    submitted = request.form.get("csrf_token", "")
+    stored = session.get("csrf_token", "")
+    if not submitted or not stored or not hmac.compare_digest(submitted, stored):
+        abort(400)
+
+
+@orders_bp.route("/orders/<order_id>/dispute/create", methods=["POST"])
+@login_required
+def dispute_create(order_id):
+    _check_csrf()
+    _, error = dispute_service.create_simulated_dispute(
+        session["merchant_id"], order_id, request.form.get("reason", "")
+    )
+    flash(error or "Simulated dispute created.")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/dispute/draft", methods=["POST"])
+@login_required
+def dispute_draft(order_id):
+    _check_csrf()
+    _, error = dispute_service.generate_draft(session["merchant_id"], order_id)
+    flash(error or "AI draft generated. Review and edit it before approving.")
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/dispute/save", methods=["POST"])
+@login_required
+def dispute_save(order_id):
+    _check_csrf()
+    approve = request.form.get("action") == "approve"
+    _, message = dispute_service.save_response(
+        session["merchant_id"], order_id, request.form.get("response_text", ""), approve
+    )
+    flash(message)
+    return redirect(url_for("orders.detail", order_id=order_id))
+
+
+def _explanations(policy):
+    """English and Bengali AI explanations of a verified policy (cached)."""
+    if not policy:
+        return {}
+    result = {}
+    for lang in ("en", "bn"):
+        text, _ = ai_service.get_explanation(policy["id"], lang)
+        if text:
+            result[lang] = text
+    return result

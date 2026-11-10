@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Pay - ClearSettle{% endblock %}
+{% block content %}
+
+<h1>Pay for order</h1>
+<p><strong>Item:</strong> {{ order.description }}</p>
+<p><strong>Amount:</strong> {{ order.amount_cents | money }} {{ order.currency }}</p>
+<p><em>Sandbox mode: no real money is charged. Test card: 4111 1111 1111 1111, any future expiry date.</em></p>
+
+<div id="dropin-container"></div>
+
+<form id="pay-form" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="payment_method_nonce" id="nonce">
+  <button type="submit" id="pay-button" disabled>Pay</button>
+</form>
+
+<p><a href="{{ url_for('orders.detail', order_id=order._id) }}">Back to order</a></p>
+
+<script src="https://js.braintreegateway.com/web/dropin/1.43.0/js/dropin.min.js"></script>
+<script>
+  var form = document.getElementById("pay-form");
+  var button = document.getElementById("pay-button");
+  var instance = null;
+
+  braintree.dropin.create(
+    { authorization: "{{ client_token }}", container: "#dropin-container" },
+    function (err, dropinInstance) {
+      if (err) { alert("Could not load the payment form: " + err.message); return; }
+      instance = dropinInstance;
+      button.disabled = false;
+    }
+  );
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    instance.requestPaymentMethod(function (err, payload) {
+      if (err) { alert(err.message); return; }
+      document.getElementById("nonce").value = payload.nonce;
+      form.submit();
+    });
+  });
+</script>
+
+{% endblock %}

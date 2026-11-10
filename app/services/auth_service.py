@@ -102,3 +102,32 @@ def username_taken(username, except_id=None):
     if except_id is not None:
         query["_id"] = {"$ne": except_id}
     return get_db().merchants.find_one(query) is not None
+
+
+def email_taken(email, except_id=None):
+    """True if another account already uses this email."""
+    query = {"email": email.strip().lower()}
+    if except_id is not None:
+        query["_id"] = {"$ne": except_id}
+    return get_db().merchants.find_one(query) is not None
+
+
+def update_profile(merchant_id, email, username, profile):
+    """Save edited details. Only these fixed fields can ever be written."""
+    fields = {"email": email.strip().lower()}
+    if username:
+        fields["username"] = username.strip().lower()
+    for f in PROFILE_FIELDS:
+        fields[f] = profile[f]
+    get_db().merchants.update_one({"_id": ObjectId(merchant_id)}, {"$set": fields})
+
+
+def change_password(merchant, current_password, new_password):
+    """Save the new password only if the current one is correct."""
+    if not check_password_hash(merchant["password_hash"], current_password):
+        return False
+    get_db().merchants.update_one(
+        {"_id": merchant["_id"]},
+        {"$set": {"password_hash": generate_password_hash(new_password)}},
+    )
+    return True

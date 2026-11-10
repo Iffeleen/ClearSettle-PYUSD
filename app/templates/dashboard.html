@@ -29,7 +29,7 @@
   {% for o in recent %}
   <tr>
     <td><a href="{{ url_for('orders.detail', order_id=o._id) }}">{{ o.buyer_name }}</a></td>
-    <td>{{ o.description }}</td>
+    <td>{{ o.description }}{% if o.get('quantity', 1) > 1 %} × {{ o.quantity }}{% endif %}</td>
     <td>{{ o.amount_cents | money }} {{ o.currency }}</td>
     <td><span class="badge badge-{{ o.status }}">{{ o.status }}</span></td>
   </tr>

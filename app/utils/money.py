@@ -17,3 +17,15 @@ def dollars_to_cents(text):
 
 def cents_to_dollars(cents):
     return f"{cents // 100}.{cents % 100:02d}"
+
+
+MAX_TOTAL_CENTS = 1_000_000  # 10000.00 USD, the same limit as before
+
+
+def parse_quantity(text):
+    """Whole number from 1 to 1000, or None."""
+    text = text.strip()
+    if not (text.isascii() and text.isdigit()):
+        return None
+    value = int(text)
+    return value if 1 <= value <= 1000 else None

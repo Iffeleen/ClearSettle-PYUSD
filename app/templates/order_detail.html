@@ -36,7 +36,9 @@
     <dl class="kv">
       <dt>Buyer</dt><dd>{{ order.buyer_name }} ({{ order.buyer_email }})</dd>
       <dt>Item</dt><dd>{{ order.description }}</dd>
-      <dt>Amount</dt><dd>{{ order.amount_cents | money }} {{ order.currency }}</dd>
+      <dt>Quantity</dt><dd>{{ order.get('quantity', 1) }}</dd>
+      <dt>Price per item</dt><dd>{{ (order.get('unit_price_cents') or order.amount_cents) | money }} {{ order.currency }}</dd>
+      <dt>Total</dt><dd>{{ order.amount_cents | money }} {{ order.currency }}</dd>
       <dt>Status</dt><dd><span class="badge badge-{{ order.status }}">{{ order.status }}</span></dd>
       <dt>Created</dt><dd>{{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</dd>
     </dl>

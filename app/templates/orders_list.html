@@ -8,14 +8,22 @@
 </div>
 {% if orders %}
 <table>
-  <tr><th>Buyer</th><th>Item</th><th>Amount</th><th>Status</th><th></th></tr>
+  <tr><th>Buyer</th><th>Item</th><th>Qty</th><th>Total</th><th>Status</th><th></th></tr>
   {% for order in orders %}
   <tr>
     <td>{{ order.buyer_name }}</td>
     <td>{{ order.description }}</td>
+    <td>{{ order.get('quantity', 1) }}</td>
     <td>{{ order.amount_cents | money }} {{ order.currency }}</td>
     <td><span class="badge badge-{{ order.status }}">{{ order.status }}</span></td>
-    <td><a class="btn" href="{{ url_for('orders.detail', order_id=order['_id']) }}">Open</a></td>
+    <td class="actions">
+      <a class="btn" href="{{ url_for('orders.detail', order_id=order['_id']) }}">Open</a>
+      {% if current not in titles %}<form method="post" action="{{ url_for('orders.remove_order', order_id=order['_id']) }}" class="inline-form"
+            onsubmit="return confirm('Delete this order permanently?{% if order.status == 'paid' %} It is PAID: its payment record, evidence files and dispute will be deleted too.{% endif %} This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn-danger">Delete</button>
+      </form>{% endif %}
+    </td>
   </tr>
   {% endfor %}
 </table>

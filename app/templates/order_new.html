@@ -5,22 +5,63 @@
   <h1>New order</h1>
   <p>Enter the buyer and item details. Payment comes after the buyer reads and accepts the policy explanation.</p>
 </div>
+
+{% if duplicate %}
+<div class="card warn-card">
+  <h2>⚠️ Possible duplicate order</h2>
+  <p>You already created a similar order for <strong>{{ duplicate.buyer_name }}</strong>
+    ({{ duplicate.description }}, quantity {{ duplicate.get('quantity', 1) }}) on
+    {{ duplicate.created_at.strftime("%Y-%m-%d %H:%M") }} UTC. Its status is
+    <span class="badge badge-{{ duplicate.status }}">{{ duplicate.status }}</span>.</p>
+  <p><a class="btn" href="{{ url_for('orders.detail', order_id=duplicate._id) }}" target="_blank" rel="noopener">View existing order</a></p>
+  <p class="note">If this is a genuine repeat purchase, click <strong>Yes, create another order</strong> below. Otherwise, cancel.</p>
+</div>
+{% endif %}
+
 <div class="card">
-  <form method="post">
+  <form method="post" id="order-form">
+    {% if duplicate %}<input type="hidden" name="confirm_duplicate" value="1">{% endif %}
     <label>Buyer name
-      <input type="text" name="buyer_name" maxlength="100" required>
+      <input type="text" name="buyer_name" maxlength="100" value="{{ form.get('buyer_name', '') }}" required>
     </label>
     <label>Buyer email
-      <input type="email" name="buyer_email" required>
+      <input type="email" name="buyer_email" value="{{ form.get('buyer_email', '') }}" required>
     </label>
     <label>Item description
-      <input type="text" name="description" maxlength="200" required>
+      <input type="text" name="description" maxlength="200" value="{{ form.get('description', '') }}" required>
     </label>
-    <label>Amount (USD)
-      <input type="number" name="amount" step="0.01" min="0.01" max="10000" required>
-    </label>
-    <button type="submit" class="btn-primary">Create order</button>
+    <div class="row2">
+      <label>Quantity
+        <input type="number" name="quantity" id="qty" min="1" max="1000" step="1" value="{{ form.get('quantity', '1') }}" required>
+      </label>
+      <label>Price per item (USD)
+        <input type="number" name="unit_price" id="unit-price" step="0.01" min="0.01" max="10000" value="{{ form.get('unit_price', '') }}" required>
+      </label>
+    </div>
+    <p class="total-preview" id="total-preview">Total: -</p>
+    <button type="submit" class="btn-primary" id="submit-btn">{{ 'Yes, create another order' if duplicate else 'Create order' }}</button>
     <a class="btn" href="{{ url_for('orders.index') }}">Cancel</a>
   </form>
 </div>
+
+<script>
+(function () {
+  var qty = document.getElementById("qty");
+  var price = document.getElementById("unit-price");
+  var out = document.getElementById("total-preview");
+  var form = document.getElementById("order-form");
+  var btn = document.getElementById("submit-btn");
+  var label = btn.textContent;
+  function update() {
+    var q = parseInt(qty.value, 10), p = parseFloat(price.value);
+    out.textContent = (q > 0 && p > 0) ? "Total: " + (q * p).toFixed(2) + " USD" : "Total: -";
+  }
+  qty.addEventListener("input", update);
+  price.addEventListener("input", update);
+  update();
+  // Stop double-clicks from creating two orders.
+  form.addEventListener("submit", function () { btn.disabled = true; btn.textContent = "Saving..."; });
+  window.addEventListener("pageshow", function () { btn.disabled = false; btn.textContent = label; });
+})();
+</script>
 {% endblock %}

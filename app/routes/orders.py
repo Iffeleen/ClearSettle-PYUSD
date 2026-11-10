@@ -20,7 +20,9 @@ from app.services import settlement_service
 from app.services import braintree_service
 from app.services.policy_service import get_verified_policies
 from app.utils.auth import login_required
-from app.utils.money import dollars_to_cents, cents_to_dollars
+from app.utils import csrf
+from app.services import order_delete
+from app.utils.money import dollars_to_cents, cents_to_dollars, parse_quantity, MAX_TOTAL_CENTS
 
 
 orders_bp = Blueprint("orders", __name__)
@@ -47,17 +49,20 @@ def index():
         order_service.list_orders(session["merchant_id"]),
         current,
     )
-    return render_template("orders_list.html", orders=orders, current=current)
+    return render_template("orders_list.html", orders=orders, current=current,
+                           csrf_token=csrf.get_token())
 
 
 @orders_bp.route("/orders/new", methods=["GET", "POST"])
 @login_required
 def new():
+    duplicate = None
     if request.method == "POST":
         buyer_name = request.form.get("buyer_name", "").strip()
         buyer_email = request.form.get("buyer_email", "").strip()
         description = request.form.get("description", "").strip()
-        amount_cents = dollars_to_cents(request.form.get("amount", ""))
+        unit_price_cents = dollars_to_cents(request.form.get("unit_price", ""))
+        quantity = parse_quantity(request.form.get("quantity", ""))
 
         if not buyer_name or len(buyer_name) > 100:
             flash("Enter the buyer's name (up to 100 characters).")
@@ -65,22 +70,33 @@ def new():
             flash("Enter a valid buyer email.")
         elif not description or len(description) > 200:
             flash("Enter a description (up to 200 characters).")
-        elif amount_cents is None:
-            flash("Enter an amount from 0.01 to 10000.00 with at most 2 decimals.")
+        elif unit_price_cents is None:
+            flash("Enter a price per item from 0.01 to 10000.00 with at most 2 decimals.")
+        elif quantity is None:
+            flash("Enter a quantity from 1 to 1000.")
+        elif unit_price_cents * quantity > MAX_TOTAL_CENTS:
+            flash("The total (price x quantity) must not exceed 10000.00.")
         else:
-            order_id = order_service.create_order(
-                session["merchant_id"],
-                buyer_name,
-                buyer_email,
-                description,
-                amount_cents,
+            duplicate = order_service.find_similar_order(
+                session["merchant_id"], buyer_email, description,
+                unit_price_cents, quantity,
             )
-            flash("Order created.")
-            return redirect(
-                url_for("orders.detail", order_id=str(order_id))
-            )
+            if duplicate is None or request.form.get("confirm_duplicate") == "1":
+                order_id = order_service.create_order(
+                    session["merchant_id"],
+                    buyer_name,
+                    buyer_email,
+                    description,
+                    unit_price_cents * quantity,
+                    quantity,
+                    unit_price_cents,
+                )
+                flash("Order created.")
+                return redirect(
+                    url_for("orders.detail", order_id=str(order_id))
+                )
 
-    return render_template("order_new.html")
+    return render_template("order_new.html", form=request.form, duplicate=duplicate)
 
 
 @orders_bp.route("/orders/<order_id>")
@@ -451,3 +467,15 @@ def settle(order_id):
     _, message = settlement_service.settle_simulated(session["merchant_id"], order_id)
     flash(message)
     return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/orders/<order_id>/delete", methods=["POST"])
+@login_required
+def remove_order(order_id):
+    if not csrf.is_valid():
+        abort(400)
+    if order_delete.delete_order(session["merchant_id"], order_id):
+        flash("Order deleted.")
+    else:
+        flash("Order not found.")
+    return redirect(url_for("orders.index"))

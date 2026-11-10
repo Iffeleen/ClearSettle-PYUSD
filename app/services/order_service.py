@@ -18,7 +18,8 @@ def hash_buyer_token(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def create_order(merchant_id, buyer_name, buyer_email, description, amount_cents):
+def create_order(merchant_id, buyer_name, buyer_email, description, amount_cents,
+                 quantity=1, unit_price_cents=None):
     now = datetime.now(timezone.utc)
 
     order = {
@@ -28,6 +29,8 @@ def create_order(merchant_id, buyer_name, buyer_email, description, amount_cents
         "description": description,
         "currency": "USD",
         "amount_cents": amount_cents,
+        "quantity": quantity,
+        "unit_price_cents": unit_price_cents if unit_price_cents is not None else amount_cents,
         "status": "pending",
         "paypal_order_id": None,
         "created_at": now,
@@ -280,3 +283,25 @@ def dashboard_stats(merchant_id, orders):
         "open_disputes": open_disputes,
         "settled": sum(1 for o in orders if o.get("settlement")),
     }
+
+
+DUPLICATE_WINDOW_DAYS = 30
+
+
+def find_similar_order(merchant_id, buyer_email, description, unit_price_cents, quantity):
+    """Return a recent order from this merchant with the same buyer email, item,
+    price and quantity (a likely accidental duplicate), or None."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=DUPLICATE_WINDOW_DAYS)
+    recent = get_db().orders.find(
+        {"merchant_id": ObjectId(merchant_id), "created_at": {"$gte": cutoff}}
+    ).sort("created_at", -1)
+    wanted_email = buyer_email.strip().lower()
+    wanted_item = " ".join(description.lower().split())
+    for o in recent:
+        same_email = o.get("buyer_email", "").strip().lower() == wanted_email
+        same_item = " ".join(o.get("description", "").lower().split()) == wanted_item
+        same_qty = o.get("quantity", 1) == quantity
+        same_price = o.get("unit_price_cents", o["amount_cents"]) == unit_price_cents
+        if same_email and same_item and same_qty and same_price:
+            return o
+    return None

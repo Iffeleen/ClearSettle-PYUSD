@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}My profile - ClearSettle{% endblock %}
+{% block content %}
+{% set dn = merchant.get('name') or merchant.email %}
+<div class="page-head">
+  <h1>My profile</h1>
+  <p>Your account and business details.</p>
+</div>
+
+<div class="card profile-head">
+  <span class="avatar big">{{ dn.split()[:2] | map('first') | join | upper }}</span>
+  <div>
+    <h2>{{ dn }}</h2>
+    <p class="muted">{% if merchant.username %}@{{ merchant.username }} · {% endif %}{{ merchant.email }}</p>
+    <p>
+      <span class="badge">Business ID: {{ merchant.business_id }}</span>
+      {% if merchant.get('created_at') %}<span class="badge">Member since {{ merchant.created_at.strftime("%Y-%m-%d") }}</span>{% endif %}
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Edit details</h2>
+  <p class="note">Your Business ID is assigned by ClearSettle and cannot be changed.</p>
+  <form method="post" action="{{ url_for('auth.profile_update') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="row2">
+      <label>Full name
+        <input type="text" name="name" maxlength="100" value="{{ values.get('name', '') }}" required>
+      </label>
+      <label>Username
+        <input type="text" name="username" maxlength="30" autocapitalize="none" value="{{ values.get('username', '') }}" {{ 'required' if merchant.username }}>
+      </label>
+    </div>
+    <div class="row2">
+      <label>Email
+        <input type="email" name="email" maxlength="254" value="{{ values.get('email', '') }}" required>
+      </label>
+      <label>Phone number
+        <input type="tel" name="phone" maxlength="20" value="{{ values.get('phone', '') }}" required>
+      </label>
+    </div>
+    <div class="row2">
+      <label>Country
+        <select name="country" required>
+          <option value="" disabled {{ 'selected' if not values.get('country') }}>Select country</option>
+          {% for c in countries %}
+          <option value="{{ c }}" {{ 'selected' if values.get('country') == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Business type
+        <select name="business_type" required>
+          <option value="" disabled {{ 'selected' if not values.get('business_type') }}>Select type</option>
+          {% for t in business_types %}
+          <option value="{{ t }}" {{ 'selected' if values.get('business_type') == t }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>Business name
+      <input type="text" name="business_name" maxlength="100" value="{{ values.get('business_name', '') }}" required>
+    </label>
+    <button type="submit" class="btn-primary">Save changes</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Change password</h2>
+  <p class="note">Your password is stored as a one-way hash, so it cannot be displayed, not even to you. Use this form to set a new one.</p>
+  <form method="post" action="{{ url_for('auth.password_change') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Current password
+      <input type="password" name="current_password" autocomplete="current-password" required>
+    </label>
+    <div class="row2">
+      <label>New password (8+ characters)
+        <input type="password" name="new_password" minlength="8" autocomplete="new-password" required>
+      </label>
+      <label>Confirm new password
+        <input type="password" name="confirm_password" minlength="8" autocomplete="new-password" required>
+      </label>
+    </div>
+    <button type="submit" class="btn-primary">Change password</button>
+  </form>
+</div>
+{% endblock %}

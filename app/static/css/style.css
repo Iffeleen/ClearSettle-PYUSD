@@ -178,3 +178,16 @@ details.profile[open] .profile-chip { box-shadow: var(--inset); }
 .pm-row span { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .pm-row strong { word-break: break-all; }
 .profile-menu form { margin-top: 6px; }
+
+/* ---------- profile page ---------- */
+.profile-head { display: flex; align-items: center; gap: 22px; }
+.profile-head h2 { margin-bottom: 4px; }
+.profile-head p { margin: 4px 0; }
+.avatar.big { width: 76px; height: 76px; font-size: 1.6rem; }
+.profile-head .badge { margin-right: 8px; }
+
+/* ---------- warnings, list actions, total preview ---------- */
+.warn-card { border-left: 6px solid var(--warn); }
+.inline-form { display: inline; }
+.actions { white-space: nowrap; }
+.total-preview { font-weight: 700; color: var(--accent); margin: 4px 0 16px; }

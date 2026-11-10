@@ -40,6 +40,7 @@
         {% if current_merchant.username %}<div class="pm-row"><span>Username</span><strong>@{{ current_merchant.username }}</strong></div>{% endif %}
         <div class="pm-row"><span>Business ID</span><strong>{{ current_merchant.business_id }}</strong></div>
         <div class="pm-row"><span>Business</span><strong>{{ current_merchant.get('business_name') or '-' }}</strong></div>
+        <a class="nav-btn" href="{{ url_for('auth.profile') }}">👤 My profile</a>
         <form method="post" action="{{ url_for('auth.logout') }}">
           <button type="submit" name="switch" value="1" class="nav-btn">🔁 Switch account</button>
           <button type="submit" class="nav-btn">🚪 Log out</button>

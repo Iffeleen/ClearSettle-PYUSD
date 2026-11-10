@@ -4,327 +4,309 @@
 
 {% block content %}
 
-<h1>Order details</h1>
-
-<p>
-    <strong>Buyer:</strong>
-    {{ order.buyer_name }} ({{ order.buyer_email }})
-</p>
-
-<p><strong>Item:</strong> {{ order.description }}</p>
-
-<p>
-    <strong>Amount:</strong>
-    {{ order.amount_cents | money }} {{ order.currency }}
-</p>
-
-<p><strong>Status:</strong> {{ order.status }}</p>
-
-<p>
-    <strong>Created:</strong>
-    {{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC
-</p>
-
-<hr>
-
 {% set consents = order.get("consents", {}) %}
 {% set merchant_consent = consents.get("merchant", {"status": "pending"}) %}
 {% set buyer_consent = consents.get("buyer", {"status": "pending"}) %}
+{% set m_status = merchant_consent.get("status", "pending") %}
+{% set b_status = buyer_consent.get("status", "pending") %}
 
-<h2>Payment</h2>
+<div class="page-head">
+  <h1>{{ order.description }}</h1>
+  <p>
+    {{ order.buyer_name }} · {{ order.amount_cents | money }} {{ order.currency }}
+    · <span class="badge badge-{{ order.status }}">{{ order.status }}</span>
+    · <a href="{{ url_for('orders.index') }}">Back to orders</a>
+  </p>
+</div>
 
-{% if order.get("payment") %}
-<p><strong>Provider:</strong> {{ order.payment.provider }}</p>
-<p><strong>Transaction ID:</strong> {{ order.payment.transaction_id }}</p>
-<p><strong>Provider status:</strong> {{ order.payment.provider_status }}</p>
-<p><strong>Paid:</strong> {{ order.payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
-{% elif order.status == "pending" %}
-<p><a href="{{ url_for('orders.pay', order_id=order._id) }}">Pay this order (sandbox)</a></p>
-{% endif %}
+<div class="tabs">
+  <button type="button" class="tab-btn" data-tab="overview">📋 Overview</button>
+  <button type="button" class="tab-btn" data-tab="consent">🤝 Consent</button>
+  <button type="button" class="tab-btn" data-tab="payment">💳 Payment</button>
+  <button type="button" class="tab-btn" data-tab="shipping">🚚 Shipping</button>
+  <button type="button" class="tab-btn" data-tab="evidence">🧾 Evidence</button>
+  <button type="button" class="tab-btn" data-tab="dispute">⚖️ Dispute</button>
+  <button type="button" class="tab-btn" data-tab="settlement">💰 Settlement</button>
+</div>
 
-<hr>
+<!-- ============ OVERVIEW ============ -->
+<section class="panel" id="panel-overview">
+  <div class="card">
+    <h2>Order details</h2>
+    <dl class="kv">
+      <dt>Buyer</dt><dd>{{ order.buyer_name }} ({{ order.buyer_email }})</dd>
+      <dt>Item</dt><dd>{{ order.description }}</dd>
+      <dt>Amount</dt><dd>{{ order.amount_cents | money }} {{ order.currency }}</dd>
+      <dt>Status</dt><dd><span class="badge badge-{{ order.status }}">{{ order.status }}</span></dd>
+      <dt>Created</dt><dd>{{ order.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</dd>
+    </dl>
+  </div>
 
-<h2>Consent records</h2>
+  <div class="card">
+    <h2>Progress</h2>
+    <ul class="steps">
+      <li class="{{ 'done' if m_status == 'accepted' else 'todo' }}"><span class="dot">{{ '✓' if m_status == 'accepted' else '1' }}</span>Merchant reviews policy explanation<a href="#" data-goto="consent">Open</a></li>
+      <li class="{{ 'done' if b_status == 'accepted' else 'todo' }}"><span class="dot">{{ '✓' if b_status == 'accepted' else '2' }}</span>Buyer acknowledges explanation<a href="#" data-goto="consent">Open</a></li>
+      <li class="{{ 'done' if order.get('payment') else 'todo' }}"><span class="dot">{{ '✓' if order.get('payment') else '3' }}</span>Sandbox payment<a href="#" data-goto="payment">Open</a></li>
+      <li class="{{ 'done' if order.get('shipping') else 'todo' }}"><span class="dot">{{ '✓' if order.get('shipping') else '4' }}</span>Courier and tracking saved<a href="#" data-goto="shipping">Open</a></li>
+      <li class="{{ 'done' if readiness_label == 'READY' else 'todo' }}"><span class="dot">{{ '✓' if readiness_label == 'READY' else '5' }}</span>Evidence uploaded ({{ readiness_label }})<a href="#" data-goto="evidence">Open</a></li>
+      <li class="{{ 'done' if dispute else 'todo' }}"><span class="dot">{{ '✓' if dispute else '6' }}</span>Dispute handling (simulated)<a href="#" data-goto="dispute">Open</a></li>
+      <li class="{{ 'done' if order.get('settlement') else 'todo' }}"><span class="dot">{{ '✓' if order.get('settlement') else '7' }}</span>PYUSD settlement (simulated)<a href="#" data-goto="settlement">Open</a></li>
+    </ul>
+  </div>
+</section>
 
-<h3>Merchant consent</h3>
+<!-- ============ CONSENT ============ -->
+<section class="panel" id="panel-consent">
+  <div class="card">
+    <h2>Merchant consent</h2>
+    <dl class="kv">
+      <dt>Status</dt><dd><span class="badge badge-{{ m_status }}">{{ m_status | title }}</span></dd>
+      {% if merchant_consent.get("timestamp") %}
+      <dt>Recorded</dt><dd>{{ merchant_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC</dd>
+      {% endif %}
+    </dl>
 
-<p>
-    <strong>Status:</strong>
-    {{ merchant_consent.get("status", "pending") | title }}
-</p>
-
-{% if merchant_consent.get("timestamp") %}
-<p>
-    <strong>Recorded:</strong>
-    {{ merchant_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC
-</p>
-{% endif %}
-
-{% if merchant_consent.get("status", "pending") == "pending" %}
-
-    {% if policy %}
-
+    {% if m_status == "pending" %}
+      {% if policy %}
         <h3>Buyer Protection explanation</h3>
-
         <p>{{ policy.text_en }}</p>
-
         <p><strong>Jurisdiction:</strong> {{ policy.jurisdiction }}</p>
 
-{% if explanations %}
-<h3>Simple explanation (AI-generated)</h3>
-{% for lang, label in [("en", "English"), ("bn", "বাংলা")] %}
-  {% if explanations.get(lang) %}
-  <p><strong>{{ label }}</strong></p>
-  <p style="white-space: pre-wrap">{{ explanations[lang] }}</p>
-  {% endif %}
-{% endfor %}
-<p><em>AI-generated from the verified text above. It is not legal advice and does
-not guarantee PayPal protection. The official PayPal page is the authority.</em></p>
-{% endif %}
+        {% if explanations %}
+        <h3>Simple explanation (AI-generated)</h3>
+        {% for lang, label in [("en", "English"), ("bn", "বাংলা")] %}
+          {% if explanations.get(lang) %}
+          <p><strong>{{ label }}</strong></p>
+          <p style="white-space: pre-wrap">{{ explanations[lang] }}</p>
+          {% endif %}
+        {% endfor %}
+        <p class="note">AI-generated from the verified text above. It is not legal advice and does
+        not guarantee PayPal protection. The official PayPal page is the authority.</p>
+        {% endif %}
 
-
-
-        <p>
-            <strong>Source:</strong>
-            <a href="{{ policy.source_url }}"
-               target="_blank"
-               rel="noopener noreferrer">
-                Official PayPal Buyer Protection page
-            </a>
+        <p><strong>Source:</strong>
+          <a href="{{ policy.source_url }}" target="_blank" rel="noopener noreferrer">Official PayPal Buyer Protection page</a>
         </p>
 
-        <p>
-            By making a decision, you acknowledge that you reviewed
-            this ClearSettle explanation. This is not acceptance of
-            PayPal's legal terms and does not guarantee PayPal protection.
-        </p>
+        <p class="note">By making a decision, you acknowledge that you reviewed this ClearSettle
+        explanation. This is not acceptance of PayPal's legal terms and does not guarantee PayPal protection.</p>
 
-        <form method="POST"
-              action="{{ url_for('orders.merchant_consent', order_id=order._id) }}">
-
-            <input type="hidden"
-                   name="csrf_token"
-                   value="{{ csrf_token }}">
-
-            <button type="submit" name="decision" value="accepted">
-                Accept explanation
-            </button>
-
-            <button type="submit" name="decision" value="declined">
-                Decline
-            </button>
-
+        <form method="POST" action="{{ url_for('orders.merchant_consent', order_id=order._id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" name="decision" value="accepted" class="btn-primary">Accept explanation</button>
+          <button type="submit" name="decision" value="declined" class="btn-danger">Decline</button>
         </form>
-
-    {% else %}
-
+      {% else %}
         <p>The verified policy explanation is unavailable. Consent cannot be submitted.</p>
+      {% endif %}
+    {% endif %}
+  </div>
 
+  <div class="card">
+    <h2>Buyer consent</h2>
+    <dl class="kv">
+      <dt>Status</dt><dd><span class="badge badge-{{ b_status }}">{{ b_status | title }}</span></dd>
+      {% if buyer_consent.get("timestamp") %}
+      <dt>Recorded</dt><dd>{{ buyer_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC</dd>
+      {% endif %}
+    </dl>
+
+    {% if buyer_consent_link %}
+      <h3>Buyer consent link</h3>
+      <p>Copy this link and share it with the buyer manually.</p>
+      <p class="link-box" id="buyer-link"><a href="{{ buyer_consent_link }}">{{ buyer_consent_link }}</a></p>
+      <p class="note">This link expires after 7 days and can be used for one decision.</p>
     {% endif %}
 
-{% endif %}
-
-{% if buyer_consent_link %}
-
-    <hr>
-
-    <h3>Buyer consent link</h3>
-
-    <p>Copy this link and share it with the buyer manually.</p>
-
-    <p>
-        <a href="{{ buyer_consent_link }}">{{ buyer_consent_link }}</a>
-    </p>
-
-    <p>This link expires after 7 days and can be used for one decision.</p>
-
-{% endif %}
-
-{% if merchant_consent.get("status") == "accepted"
-      and buyer_consent.get("status", "pending") == "pending"
-      and not buyer_consent_link %}
-<form method="POST"
-      action="{{ url_for('orders.new_buyer_link', order_id=order._id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit">Generate new buyer link</button>
-</form>
-{% endif %}
-
-<h3>Buyer consent</h3>
-
-<p>
-    <strong>Status:</strong>
-    {{ buyer_consent.get("status", "pending") | title }}
-</p>
-
-{% if buyer_consent.get("timestamp") %}
-<p>
-    <strong>Recorded:</strong>
-    {{ buyer_consent.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC
-</p>
-{% endif %}
-
-<hr>
-
-<p>
-    <a href="{{ url_for('orders.index') }}">Back to orders</a>
-</p>
-
-<hr>
-
-<h2>Evidence</h2>
-
-<p>
-    <strong>Completeness:</strong> {{ readiness_label }}
-    {% if missing %}
-        (missing: {{ missing | join(", ") }})
+    {% if m_status == "accepted" and b_status == "pending" and not buyer_consent_link %}
+    <form method="POST" action="{{ url_for('orders.new_buyer_link', order_id=order._id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn-primary">Generate new buyer link</button>
+    </form>
     {% endif %}
-</p>
+  </div>
+</section>
 
-<p>
-    This checks only that each required item was uploaded. It does not
-    judge the quality or authenticity of the images.
-</p>
+<!-- ============ PAYMENT ============ -->
+<section class="panel" id="panel-payment">
+  <div class="card">
+    <h2>Payment (sandbox)</h2>
+    {% if order.get("payment") %}
+    <dl class="kv">
+      <dt>Provider</dt><dd>{{ order.payment.provider }}</dd>
+      <dt>Transaction ID</dt><dd>{{ order.payment.transaction_id }}</dd>
+      <dt>Provider status</dt><dd>{{ order.payment.provider_status }}</dd>
+      <dt>Paid</dt><dd>{{ order.payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</dd>
+    </dl>
+    {% elif order.status == "pending" %}
+    <p>The buyer must accept the explanation first, then you can run the sandbox payment.</p>
+    <a class="btn btn-primary" href="{{ url_for('orders.pay', order_id=order._id) }}">Pay this order (sandbox)</a>
+    {% endif %}
+  </div>
+</section>
 
-{% if evidence_items %}
-<table>
-  <tr>
-    <th>Type</th><th>Format</th><th>Size (bytes)</th>
-    <th>SHA256 (first 16)</th><th>Uploaded (UTC)</th>
-  </tr>
-  {% for e in evidence_items %}
-  <tr>
-    <td>{{ e.evidence_type }}</td>
-    <td>{{ e.file_type }}</td>
-    <td>{{ e.size_bytes }}</td>
-    <td>{{ e.sha256[:16] }}...</td>
-    <td>{{ e.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p>No evidence uploaded yet.</p>
-{% endif %}
+<!-- ============ SHIPPING ============ -->
+<section class="panel" id="panel-shipping">
+  <div class="card">
+    <h2>Shipping details</h2>
+    {% if order.get("shipping") %}
+    <dl class="kv">
+      <dt>Courier</dt><dd>{{ order.shipping.courier }}</dd>
+      <dt>Tracking number</dt><dd>{{ order.shipping.tracking_number }}</dd>
+    </dl>
+    {% endif %}
 
-{% if evidence_items %}
-<form method="POST" action="{{ url_for('orders.verify_evidence', order_id=order._id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit">Verify evidence integrity</button>
-</form>
-<p><em>Checks that files are unchanged since upload. It does not prove the images are genuine.</em></p>
-{% endif %}
-
-<h3>Shipping details</h3>
-
-{% if order.get("shipping") %}
-<p><strong>Courier:</strong> {{ order.shipping.courier }}</p>
-<p><strong>Tracking number:</strong> {{ order.shipping.tracking_number }}</p>
-{% endif %}
-
-{% if order.status == "paid" %}
-<form method="POST" action="{{ url_for('orders.save_shipping', order_id=order._id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Courier
-        <input type="text" name="courier" maxlength="50" required>
-    </label>
-    <label>Tracking number
-        <input type="text" name="tracking_number" maxlength="40" required>
-    </label>
-    <button type="submit">Save shipping details</button>
-</form>
-{% else %}
-<p>Shipping details can be added after the order is paid.</p>
-{% endif %}
-
-<h3>Upload evidence</h3>
-
-<form method="POST"
-      action="{{ url_for('orders.upload_evidence', order_id=order._id) }}"
-      enctype="multipart/form-data">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Evidence type
-        <select name="evidence_type" required>
-            <option value="packing_photo">Packing photo</option>
-            <option value="shipping_label">Shipping label</option>
-            <option value="delivery_proof">Delivery proof</option>
-        </select>
-    </label>
-    <label>Image (JPEG or PNG, max 5 MB)
-        <input type="file" name="file" accept="image/jpeg,image/png" required>
-    </label>
-    <button type="submit">Upload</button>
-</form>
-
-<hr>
-
-<h2>Settlement (simulated)</h2>
-
-<p><em>Prototype simulation: no PYUSD is transferred, and there is no wallet or
-blockchain transaction. The buyer paid by sandbox card through Braintree.</em></p>
-
-{% if order.get("settlement") %}
-<p><strong>Asset:</strong> {{ order.settlement.asset }} (simulated)</p>
-<p><strong>Amount:</strong> {{ order.settlement.amount }}</p>
-<p><strong>Simulation reference:</strong> {{ order.settlement.reference }}
-   (not a blockchain transaction)</p>
-<p><strong>Recorded:</strong> {{ order.settlement.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
-{% elif order.status == "paid" %}
-<form method="POST" action="{{ url_for('orders.settle', order_id=order._id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit">Run simulated PYUSD settlement</button>
-</form>
-{% else %}
-<p>Settlement is available after payment.</p>
-{% endif %}
-
-<hr>
-
-<h2>Dispute (simulated)</h2>
-
-<p><em>Demo only: no real PayPal or Braintree dispute exists. Nothing is sent
-to PayPal, and the deadline below is a demo value, not a PayPal deadline.</em></p>
-
-{% if not dispute %}
     {% if order.status == "paid" %}
-    <form method="POST" action="{{ url_for('orders.dispute_create', order_id=order._id) }}">
+    <h3>{{ 'Update' if order.get("shipping") else 'Add' }} shipping details</h3>
+    <form method="POST" action="{{ url_for('orders.save_shipping', order_id=order._id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Courier
+        <input type="text" name="courier" maxlength="50" required>
+      </label>
+      <label>Tracking number
+        <input type="text" name="tracking_number" maxlength="40" required>
+      </label>
+      <button type="submit" class="btn-primary">Save shipping details</button>
+    </form>
+    {% else %}
+    <p>Shipping details can be added after the order is paid.</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section class="panel" id="panel-evidence">
+  <div class="card">
+    <h2>Evidence</h2>
+    <p>
+      <strong>Completeness:</strong> <span class="badge badge-{{ readiness_label }}">{{ readiness_label }}</span>
+      {% if missing %}<span class="muted">(missing: {{ missing | join(", ") }})</span>{% endif %}
+    </p>
+    <p class="note">This checks only that each required item was uploaded. It does not
+    judge the quality or authenticity of the images.</p>
+
+    {% if evidence_items %}
+    <table>
+      <tr><th>Type</th><th>Format</th><th>Size (bytes)</th><th>SHA256 (first 16)</th><th>Uploaded (UTC)</th></tr>
+      {% for e in evidence_items %}
+      <tr>
+        <td>{{ e.evidence_type }}</td>
+        <td>{{ e.file_type }}</td>
+        <td>{{ e.size_bytes }}</td>
+        <td>{{ e.sha256[:16] }}...</td>
+        <td>{{ e.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <form method="POST" action="{{ url_for('orders.verify_evidence', order_id=order._id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Verify evidence integrity</button>
+    </form>
+    <p class="note">Checks that files are unchanged since upload. It does not prove the images are genuine.</p>
+    {% else %}
+    <p>No evidence uploaded yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Upload evidence</h2>
+    <form method="POST" action="{{ url_for('orders.upload_evidence', order_id=order._id) }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Evidence type
+        <select name="evidence_type" required>
+          <option value="packing_photo">Packing photo</option>
+          <option value="shipping_label">Shipping label</option>
+          <option value="delivery_proof">Delivery proof</option>
+        </select>
+      </label>
+      <label>Image (JPEG or PNG, max 5 MB)
+        <input type="file" name="file" accept="image/jpeg,image/png" required>
+      </label>
+      <button type="submit" class="btn-primary">Upload</button>
+    </form>
+  </div>
+</section>
+
+<!-- ============ DISPUTE ============ -->
+<section class="panel" id="panel-dispute">
+  <div class="card">
+    <h2>Dispute (simulated)</h2>
+    <p class="note">Demo only: no real PayPal or Braintree dispute exists. Nothing is sent
+    to PayPal, and the deadline below is a demo value, not a PayPal deadline.</p>
+
+    {% if not dispute %}
+      {% if order.status == "paid" %}
+      <form method="POST" action="{{ url_for('orders.dispute_create', order_id=order._id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label>Simulated dispute reason
-            <select name="reason">
-                <option value="item_not_received">Item not received</option>
-                <option value="item_not_as_described">Item not as described</option>
-            </select>
+          <select name="reason">
+            <option value="item_not_received">Item not received</option>
+            <option value="item_not_as_described">Item not as described</option>
+          </select>
         </label>
-        <button type="submit">Create simulated dispute</button>
-    </form>
+        <button type="submit" class="btn-primary">Create simulated dispute</button>
+      </form>
+      {% else %}
+      <p>A dispute can be simulated only on a paid order.</p>
+      {% endif %}
     {% else %}
-    <p>A dispute can be simulated only on a paid order.</p>
-    {% endif %}
-{% else %}
-    <p><strong>Reason:</strong> {{ dispute.reason }}</p>
-    <p><strong>Status:</strong> {{ dispute.status }}</p>
-    <p><strong>Demo deadline:</strong> {{ dispute.demo_deadline.strftime("%Y-%m-%d") }}</p>
+      <dl class="kv">
+        <dt>Reason</dt><dd>{{ dispute.reason }}</dd>
+        <dt>Status</dt><dd><span class="badge badge-{{ dispute.status }}">{{ dispute.status }}</span></dd>
+        <dt>Demo deadline</dt><dd>{{ dispute.demo_deadline.strftime("%Y-%m-%d") }}</dd>
+      </dl>
 
-    {% if dispute.status == "open" %}
-    <form method="POST" action="{{ url_for('orders.dispute_draft', order_id=order._id) }}">
+      {% if dispute.status == "open" %}
+      <h3>AI draft reply</h3>
+      <form method="POST" action="{{ url_for('orders.dispute_draft', order_id=order._id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit">Generate AI draft</button>
-    </form>
+        <button type="submit">✨ Generate AI draft</button>
+      </form>
 
-    <form method="POST" action="{{ url_for('orders.dispute_save', order_id=order._id) }}">
+      <form method="POST" action="{{ url_for('orders.dispute_save', order_id=order._id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label>Response (edit as needed)
-            <textarea name="response_text" rows="12" style="width:100%">{{ dispute.edited_response or dispute.draft_response or "" }}</textarea>
+          <textarea name="response_text" rows="12">{{ dispute.edited_response or dispute.draft_response or "" }}</textarea>
         </label>
-        <p><em>The draft is AI-generated from this order's recorded data. Check every
-        statement before approving. Nothing is final until you approve.</em></p>
+        <p class="note">The draft is AI-generated from this order's recorded data. Check every
+        statement before approving. Nothing is final until you approve.</p>
         <button type="submit" name="action" value="save">Save draft</button>
-        <button type="submit" name="action" value="approve">Approve and submit (simulated)</button>
+        <button type="submit" name="action" value="approve" class="btn-primary">Approve and submit (simulated)</button>
+      </form>
+      {% else %}
+      <p><strong>Approved by merchant:</strong> {{ dispute.approved_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC (simulated, not sent to PayPal)</p>
+      <p><strong>Final response:</strong></p>
+      <p class="link-box" style="white-space: pre-wrap">{{ dispute.final_response }}</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+
+<!-- ============ SETTLEMENT ============ -->
+<section class="panel" id="panel-settlement">
+  <div class="card">
+    <h2>Settlement (simulated)</h2>
+    <p class="note">Prototype simulation: no PYUSD is transferred, and there is no wallet or
+    blockchain transaction. The buyer paid by sandbox card through Braintree.</p>
+
+    {% if order.get("settlement") %}
+    <dl class="kv">
+      <dt>Asset</dt><dd>{{ order.settlement.asset }} (simulated)</dd>
+      <dt>Amount</dt><dd>{{ order.settlement.amount }}</dd>
+      <dt>Reference</dt><dd>{{ order.settlement.reference }} (not a blockchain transaction)</dd>
+      <dt>Recorded</dt><dd>{{ order.settlement.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</dd>
+    </dl>
+    {% elif order.status == "paid" %}
+    <form method="POST" action="{{ url_for('orders.settle', order_id=order._id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn-primary">Run simulated PYUSD settlement</button>
     </form>
     {% else %}
-    <p><strong>Approved by merchant:</strong> {{ dispute.approved_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC (simulated, not sent to PayPal)</p>
-    <p><strong>Final response:</strong></p>
-    <p style="white-space: pre-wrap">{{ dispute.final_response }}</p>
+    <p>Settlement is available after payment.</p>
     {% endif %}
-{% endif %}
+  </div>
+</section>
 
+<script src="{{ url_for('static', filename='js/tabs.js') }}"></script>
 {% endblock %}

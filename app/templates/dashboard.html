@@ -1,10 +1,41 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - ClearSettle{% endblock %}
 {% block content %}
-<h1>Merchant dashboard</h1>
-<p>Logged in as <strong>{{ merchant.email }}</strong></p>
-<p><a href="{{ url_for('orders.index') }}">View orders</a> | <a href="{{ url_for('orders.new') }}">+ New order</a></p>
-<form method="post" action="{{ url_for('auth.logout') }}">
-  <button type="submit">Log out</button>
-</form>
+<div class="page-head">
+  <h1>Dashboard</h1>
+  <p>Signed in as <strong>{{ merchant.email }}</strong></p>
+</div>
+
+<div class="grid grid-3">
+  <div class="stat"><div class="ico">📦</div><div><div class="num">{{ stats.total }}</div><div class="lbl">Total orders</div></div></div>
+  <div class="stat"><div class="ico">💳</div><div><div class="num">{{ stats.paid }}</div><div class="lbl">Paid · {{ stats.paid_cents | money }} USD (sandbox)</div></div></div>
+  <div class="stat"><div class="ico">⚖️</div><div><div class="num">{{ stats.open_disputes }}</div><div class="lbl">Open disputes (simulated)</div></div></div>
+</div>
+
+<h3>Quick actions</h3>
+<div class="grid grid-tiles">
+  <a class="tile" href="{{ url_for('orders.new') }}"><span class="ico">➕</span><strong>New order</strong><span class="sub">Start a sale</span></a>
+  <a class="tile" href="{{ url_for('orders.index') }}"><span class="ico">📦</span><strong>All orders</strong><span class="sub">{{ stats.total }} total</span></a>
+  <a class="tile" href="{{ url_for('orders.index', filter='unpaid') }}"><span class="ico">⏳</span><strong>Awaiting payment</strong><span class="sub">{{ stats.awaiting }} order{{ '' if stats.awaiting == 1 else 's' }}</span></a>
+  <a class="tile" href="{{ url_for('orders.index', filter='paid') }}"><span class="ico">🚚</span><strong>Shipping &amp; evidence</strong><span class="sub">{{ stats.paid }} paid orders</span></a>
+  <a class="tile" href="{{ url_for('orders.index', filter='disputes') }}"><span class="ico">⚖️</span><strong>Disputes</strong><span class="sub">AI draft &amp; approval</span></a>
+  <a class="tile" href="{{ url_for('orders.index', filter='settled') }}"><span class="ico">💰</span><strong>Settlements</strong><span class="sub">{{ stats.settled }} simulated</span></a>
+</div>
+
+<h3>Recent orders</h3>
+{% if recent %}
+<table>
+  <tr><th>Buyer</th><th>Item</th><th>Amount</th><th>Status</th></tr>
+  {% for o in recent %}
+  <tr>
+    <td><a href="{{ url_for('orders.detail', order_id=o._id) }}">{{ o.buyer_name }}</a></td>
+    <td>{{ o.description }}</td>
+    <td>{{ o.amount_cents | money }} {{ o.currency }}</td>
+    <td><span class="badge badge-{{ o.status }}">{{ o.status }}</span></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="card inset">No orders yet. Use <strong>New order</strong> to create your first one.</div>
+{% endif %}
 {% endblock %}

@@ -41,8 +41,13 @@ def get_buyer_protection_policy():
 @orders_bp.route("/orders")
 @login_required
 def index():
-    orders = order_service.list_orders(session["merchant_id"])
-    return render_template("orders_list.html", orders=orders)
+    current = request.args.get("filter", "")
+    orders = order_service.filter_orders(
+        session["merchant_id"],
+        order_service.list_orders(session["merchant_id"]),
+        current,
+    )
+    return render_template("orders_list.html", orders=orders, current=current)
 
 
 @orders_bp.route("/orders/new", methods=["GET", "POST"])

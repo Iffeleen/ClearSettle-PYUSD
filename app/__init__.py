@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask
 from config import Config
 from app import db
@@ -7,6 +9,12 @@ from app.utils.money import cents_to_dollars
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # Behind a hosting proxy (Render), trust its forwarded headers so generated
+    # links use https and the real host. Only enabled on the server.
+    if os.getenv("TRUST_PROXY") == "1":
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     db.init_db(app)
     app.jinja_env.filters["money"] = cents_to_dollars
